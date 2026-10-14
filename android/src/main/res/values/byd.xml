@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="byd_parked_title" translatable="false">Stay connected while parked</string>
+    <string name="byd_parked_subtitle" translatable="false">Keep Tailscale available after ACC off while the display stays dark.</string>
+    <string name="byd_wifi_title" translatable="false">Keep Wi-Fi available while parked</string>
+    <string name="byd_wifi_subtitle" translatable="false">Restore Wi-Fi after ACC off. Cellular remains supported when available.</string>
+    <string name="byd_status_title" translatable="false">Parked connectivity</string>
+</resources>

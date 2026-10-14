@@ -5,6 +5,7 @@ package com.tailscale.ipn.ui.localapi
 
 import android.content.Context
 import com.tailscale.ipn.App
+import com.tailscale.ipn.byd.BydPreferences
 import com.tailscale.ipn.ui.model.BugReportID
 import com.tailscale.ipn.ui.model.Errors
 import com.tailscale.ipn.ui.model.Favorites
@@ -143,6 +144,7 @@ class Client(private val scope: CoroutineScope) {
   }
 
   fun logout(responseHandler: (Result<String>) -> Unit) {
+    BydPreferences.setWanted(App.get(), false)
     return post(Endpoint.LOGOUT, responseHandler = responseHandler)
   }
 

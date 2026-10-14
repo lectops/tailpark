@@ -9,6 +9,8 @@ import android.net.Network
 import android.net.VpnService
 import android.os.Build
 import android.system.OsConstants
+import com.tailscale.ipn.byd.BydPowerController
+import com.tailscale.ipn.byd.BydPreferences
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.ui.model.Ipn
 import com.tailscale.ipn.ui.notifier.Notifier
@@ -26,6 +28,13 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   private lateinit var app: App
   val scope = CoroutineScope(Dispatchers.IO)
   private var closed = false
+  private var parkedController: BydPowerController? = null
+
+  private fun startParkedMode() {
+    BydPreferences.setWanted(this, true)
+    if (parkedController == null) parkedController = BydPowerController(this)
+    parkedController?.start()
+  }
 
   override fun id(): String {
     return randomID
@@ -70,6 +79,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           showForegroundNotification()
           app.setWantRunning(true)
           Libtailscale.requestVPN(this)
+          startParkedMode()
           START_STICKY
         }
         "android.net.VpnService" -> {
@@ -85,15 +95,20 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           }
           app.setWantRunning(true)
           Libtailscale.requestVPN(this)
+          startParkedMode()
           START_STICKY
         }
         else -> {
           // This means that we were restarted after the service was killed
           // (potentially due to OOM).
-          if (UninitializedApp.get().isAbleToStartVPN()) {
+          if (
+              UninitializedApp.get().isAbleToStartVPN() &&
+                  BydPreferences.prefs(this).getBoolean("wanted", false)
+          ) {
             showForegroundNotification()
             App.get()
             Libtailscale.requestVPN(this)
+            startParkedMode()
             START_STICKY
           } else {
             START_NOT_STICKY
@@ -114,6 +129,8 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   override fun onDestroy() {
+    parkedController?.close()
+    parkedController = null
     NetworkChangeCallback.setUnderlyingNetworkListener(null)
     close()
     updateVpnStatus(false)
@@ -252,10 +269,10 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   companion object {
-    const val ACTION_START_VPN = "com.tailscale.ipn.START_VPN"
-    const val ACTION_STOP_VPN = "com.tailscale.ipn.STOP_VPN"
-    const val ACTION_RESTART_VPN = "com.tailscale.ipn.RESTART_VPN"
-    const val ACTION_START_FOREGROUND_ONLY = "com.tailscale.ipn.START_FOREGROUND_ONLY"
+    const val ACTION_START_VPN = BuildConfig.APPLICATION_ID + ".START_VPN"
+    const val ACTION_STOP_VPN = BuildConfig.APPLICATION_ID + ".STOP_VPN"
+    const val ACTION_RESTART_VPN = BuildConfig.APPLICATION_ID + ".RESTART_VPN"
+    const val ACTION_START_FOREGROUND_ONLY = BuildConfig.APPLICATION_ID + ".START_FOREGROUND_ONLY"
   }
 }
 

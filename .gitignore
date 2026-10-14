@@ -1,5 +1,7 @@
 # Ignore Gradle project-specific cache directory
 .gradle
+.kotlin
+__pycache__/
 
 # Ignore Gradle build output directory
 build
@@ -24,6 +26,14 @@ android/local.properties
 
 # Signing key
 tailscale.jks
+.signing/
+outputs/
+.serena/
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
 
 # android sdk dir
 /android-sdk/

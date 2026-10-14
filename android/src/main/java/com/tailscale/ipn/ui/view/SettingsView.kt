@@ -30,8 +30,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tailscale.ipn.App
 import com.tailscale.ipn.BuildConfig
 import com.tailscale.ipn.R
+import com.tailscale.ipn.byd.BydPreferences
 import com.tailscale.ipn.mdm.AlwaysNeverUserDecides
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.ShowHide
@@ -65,6 +67,9 @@ fun SettingsView(
   val useTailscaleSubnets by MDMSettings.useTailscaleSubnets.flow.collectAsState()
   val isClientRemoteLoggingEnabled by viewModel.isClientRemoteLoggingEnabled.collectAsState()
   var showDisableLoggingDialog by remember { mutableStateOf(false) }
+  val parkedEnabled by BydPreferences.enabled.collectAsState()
+  val parkedWifi by BydPreferences.keepWifi.collectAsState()
+  val parkedStatus by BydPreferences.status.collectAsState()
 
   Scaffold(
       topBar = {
@@ -84,6 +89,24 @@ fun SettingsView(
         Lists.ItemDivider()
         AdminTextView { handler.openUri(Links.ADMIN_URL) }
       }
+
+      Lists.SectionDivider()
+      Setting.Switch(
+          R.string.byd_parked_title,
+          subtitle = stringResource(R.string.byd_parked_subtitle),
+          isOn = parkedEnabled,
+          onToggle = { BydPreferences.setEnabled(App.get(), !parkedEnabled) },
+      )
+      Lists.ItemDivider()
+      Setting.Switch(
+          R.string.byd_wifi_title,
+          subtitle = stringResource(R.string.byd_wifi_subtitle),
+          isOn = parkedWifi,
+          enabled = parkedEnabled,
+          onToggle = { BydPreferences.setKeepWifi(App.get(), !parkedWifi) },
+      )
+      Lists.ItemDivider()
+      Setting.Text(R.string.byd_status_title, subtitle = parkedStatus)
 
       Lists.SectionDivider()
       Setting.Text(

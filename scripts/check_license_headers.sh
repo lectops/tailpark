@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 # check_license_headers.sh checks that source files in the given
-# directory tree have a correct-looking Tailscale license header.
+# directory tree have an upstream or BYD contributor BSD license header.
 
 check_file() {
 	got=$1
@@ -16,6 +16,15 @@ check_file() {
 EOF
 	)
 	if [ "$got" = "$want" ]; then
+		return 0
+	fi
+	byd=$(
+		cat <<EOF
+// Copyright (c) Tailscale BYD contributors
+// SPDX-License-Identifier: BSD-3-Clause
+EOF
+	)
+	if [ "$got" = "$byd" ]; then
 		return 0
 	fi
 	return 1

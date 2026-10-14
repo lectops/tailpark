@@ -1,0 +1,122 @@
+// Copyright (c) Tailscale BYD contributors
+// SPDX-License-Identifier: BSD-3-Clause
+package com.tailscale.ipn.byd
+
+import org.junit.Assert.*
+import org.junit.Test
+
+class ParkedPowerStateTest {
+  private class Actions : ParkedPowerState.Actions {
+    val calls = mutableListOf<String>()
+    var denyWake = false
+
+    override fun wake() {
+      calls += "wake"
+      if (denyWake) throw IllegalStateException("DEVICE_POWER denied")
+    }
+
+    override fun backlightOff() {
+      calls += "dark"
+    }
+
+    override fun enableWifi() {
+      calls += "wifi"
+    }
+  }
+
+  @Test
+  fun parkedSequenceWaitsThenWakesAndDarkens() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    state.tick(true, true, 0, true, 0)
+    state.tick(true, true, 0, true, 500)
+    assertTrue(actions.calls.isEmpty())
+    state.tick(true, true, 0, false, 1000)
+    assertEquals(listOf("wake"), actions.calls)
+    state.tick(true, true, 0, true, 1499)
+    assertEquals(listOf("wake"), actions.calls)
+    state.tick(true, true, 0, true, 1500)
+    assertEquals(listOf("wake", "dark"), actions.calls)
+    state.tick(true, true, 0, true, 4000)
+    assertEquals(listOf("wake", "dark", "wifi"), actions.calls)
+    state.tick(true, true, 0, true, 4500)
+    assertEquals(listOf("wake", "dark", "wifi", "dark"), actions.calls)
+  }
+
+  @Test
+  fun accOnCancelsDelayedBacklightOff() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    state.tick(true, true, 0, false, 0)
+    state.tick(true, true, 2, true, 500)
+    state.tick(true, true, 2, true, 10000)
+    assertEquals(listOf("wake"), actions.calls)
+    assertEquals(ParkedPowerState.Phase.DRIVING, state.phase())
+  }
+
+  @Test
+  fun disconnectCancelsParkedLoop() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    state.tick(true, true, 0, false, 0)
+    state.tick(true, true, 0, true, 500)
+    state.tick(false, true, 0, true, 4000)
+    assertEquals(listOf("wake", "dark"), actions.calls)
+    assertEquals(ParkedPowerState.Phase.OFF, state.phase())
+  }
+
+  @Test
+  fun unavailablePowerNeverControlsTheDisplay() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    state.tick(true, true, null, false, 0)
+    state.tick(true, true, null, false, 5000)
+    assertTrue(actions.calls.isEmpty())
+    state.tick(true, true, 0, false, 6000)
+    state.tick(true, true, null, true, 6500)
+    assertEquals(listOf("wake"), actions.calls)
+  }
+
+  @Test
+  fun cellularModeNeverEnablesWifi() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    state.tick(true, false, 0, false, 0)
+    state.tick(true, false, 0, true, 500)
+    state.tick(true, false, 0, true, 5000)
+    assertEquals(listOf("wake", "dark", "dark"), actions.calls)
+  }
+
+  @Test
+  fun screenTimeoutDoesNotWakeUntilScreenActuallySleeps() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    state.tick(true, true, 0, true, 0)
+    state.tick(true, true, 0, true, 40000)
+    assertTrue(actions.calls.isEmpty())
+    assertEquals(ParkedPowerState.Phase.TIMED_OUT, state.phase())
+    state.tick(true, true, 0, false, 45000)
+    assertEquals(listOf("wake"), actions.calls)
+  }
+
+  @Test
+  fun permissionFailureRemainsVisible() {
+    val actions = Actions().apply { denyWake = true }
+    val state = ParkedPowerState(actions)
+    state.tick(true, true, 0, false, 0)
+    state.tick(true, true, 0, true, 500)
+    assertEquals("DEVICE_POWER denied", state.error())
+    assertEquals(listOf("wake", "dark"), actions.calls)
+  }
+
+  @Test
+  fun nextParkingCycleRunsTheSequenceAgain() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    state.tick(true, true, 0, false, 0)
+    state.tick(true, true, 0, true, 500)
+    state.tick(true, true, 2, true, 1000)
+    state.tick(true, true, 0, false, 2000)
+    assertEquals(listOf("wake", "dark", "wake"), actions.calls)
+  }
+}

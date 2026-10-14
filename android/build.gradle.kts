@@ -22,11 +22,12 @@ android {
   compileSdk = androidApiLevel
 
   defaultConfig {
+    applicationId = "dev.tailscale.byd"
     minSdk = 26
     targetSdk = androidApiLevel
 
     versionCode = computeVersionCode()
-    versionName = getVersionProperty("VERSION_LONG")
+    versionName = getVersionProperty("VERSION_LONG") + "-byd.1"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     buildConfigField(
@@ -51,10 +52,22 @@ android {
   flavorDimensions += "version"
   namespace = "com.tailscale.ipn"
 
+  signingConfigs {
+    create("byd") {
+      storeFile = file("../.signing/byd.jks")
+      val passwordFile = file("../.signing/password")
+      val password = if (passwordFile.exists()) passwordFile.readText().trim() else ""
+      storePassword = password
+      keyPassword = password
+      keyAlias = "tailscale-byd"
+    }
+  }
+
   buildTypes {
     debug { manifestPlaceholders["leanbackRequired"] = isTV() }
 
     release {
+      signingConfig = signingConfigs.getByName("byd")
       manifestPlaceholders["leanbackRequired"] = isTV()
       isMinifyEnabled = true
       isShrinkResources = true
