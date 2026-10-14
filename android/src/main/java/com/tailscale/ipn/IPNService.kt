@@ -29,10 +29,14 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   val scope = CoroutineScope(Dispatchers.IO)
   private var closed = false
   private var parkedController: BydPowerController? = null
+  @Volatile private var bydVpnActive = false
 
   private fun startParkedMode() {
     BydPreferences.setWanted(this, true)
-    if (parkedController == null) parkedController = BydPowerController(this)
+    if (parkedController == null) {
+      parkedController =
+          BydPowerController(this) { bydVpnActive && Notifier.state.value == Ipn.State.Running }
+    }
     parkedController?.start()
   }
 
@@ -41,6 +45,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   override fun updateVpnStatus(status: Boolean) {
+    bydVpnActive = status
     app.getAppScopedViewModel().setVpnActive(status)
   }
 
@@ -118,6 +123,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
 
   override fun close() {
     if (closed) return
+    bydVpnActive = false
     closed = true
     Notifier.setState(Ipn.State.Stopping)
     disconnectVPN()
@@ -206,6 +212,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   override fun newBuilder(): VPNServiceBuilder {
+    bydVpnActive = false
     val b: Builder =
         Builder()
             .setConfigureIntent(configIntent())

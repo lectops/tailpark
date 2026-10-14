@@ -207,10 +207,6 @@ func (b *backend) updateTUN(rcfg *router.Config, dcfg *dns.OSConfig) (err error)
 		}
 		return fmt.Errorf("VpnService.Builder.establish: %v", err)
 	}
-	log.Printf("Setting vpn activity status to true")
-	vpnService.service.UpdateVpnStatus(true)
-	b.logger.Logf("updateTUN: established VPN")
-
 	if parcelFD == nil {
 		b.logger.Logf("updateTUN: could not establish VPN because builder.Establish returned a nil ParcelFileDescriptor")
 		return errVPNNotPrepared
@@ -236,6 +232,9 @@ func (b *backend) updateTUN(rcfg *router.Config, dcfg *dns.OSConfig) (err error)
 
 	b.devices.add(tunDev)
 	b.logger.Logf("updateTUN: added TUN device")
+	// Report health only after a real descriptor has become a TUN device.
+	log.Printf("Setting vpn activity status to true")
+	vpnService.service.UpdateVpnStatus(true)
 
 	if b.devices.Up() {
 		b.logger.Logf("tunnel brought up")

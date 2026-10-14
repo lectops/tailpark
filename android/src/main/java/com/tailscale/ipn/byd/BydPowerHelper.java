@@ -28,22 +28,31 @@ public final class BydPowerHelper {
     private final String apkPath;
     private final BydPlatform platform;
     private final ParkedPowerState state;
+    private final BydRuntimeFiles runtime;
+    private final BydRecoveryPolicy recovery = new BydRecoveryPolicy(SystemClock.elapsedRealtime());
     public static final int PORT = 41642;
     private final ServerSocket server;
     private final ScheduledExecutorService ticker = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService maintenance = Executors.newSingleThreadScheduledExecutor();
     private volatile boolean alive = true;
     private volatile boolean keepWifi = true;
-    private volatile long heartbeat = SystemClock.elapsedRealtime();
-    private long lastRecovery;
+    private long lastFileHeartbeat;
+    private long lastPreferenceCheck;
+    private volatile long suspendMs;
+    private long previousSleep = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis();
 
     private BydPowerHelper(Context context, String token) throws IOException, PackageManager.NameNotFoundException {
         this.context = context;
         this.token = token;
-        apkPath = context.getApplicationInfo().sourceDir;
+        apkPath = System.getProperty("java.class.path", context.getApplicationInfo().sourceDir);
+        runtime = new BydRuntimeFiles(context.getPackageName());
         // Binding first gives one process ownership; a duplicate exits without acquiring locks.
         server = new ServerSocket();
         server.setReuseAddress(true);
         server.bind(new InetSocketAddress("127.0.0.1", PORT));
+        runtime.write("helper.pid", Integer.toString(Process.myPid()));
+        runtime.write("helper.apk", apkPath);
+        runtime.write("helper.identity", BydRuntimeFiles.fingerprint(token));
         // Framework/AppOps attribution must match the actual shell UID, not the VPN's app UID.
         Context shellContext = context.createPackageContext("com.android.shell", Context.CONTEXT_IGNORE_SECURITY);
         platform = new BydPlatform(shellContext);
@@ -51,8 +60,13 @@ public final class BydPowerHelper {
     }
 
     public static void main(String[] args) {
-        if (args.length != 2 || !args[0].matches("[A-Za-z0-9_.]+") || args[1].length() != 72) return;
+        if (args.length != 2 || !args[0].matches("[A-Za-z0-9_.]+")
+                || !args[1].matches("[0-9a-f-]{72}") || Process.myUid() != 2000) return;
         try {
+            BydRuntimeFiles runtime = new BydRuntimeFiles(args[0]);
+            if (runtime.file("disabled").exists()) return;
+            String wifi = BydRuntimeFiles.desiredConfig(args[0], args[1]);
+            if (wifi == null) { runtime.disable(); return; }
             Looper.prepareMainLooper();
             Class<?> activityThread = Class.forName("android.app.ActivityThread");
             Object thread = activityThread.getMethod("systemMain").invoke(null);
@@ -60,12 +74,15 @@ public final class BydPowerHelper {
             Context context = system.createPackageContext(args[0],
                     Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
             BydPowerHelper helper = new BydPowerHelper(context, args[1]);
+            helper.keepWifi = wifi.equals("1");
             helper.ticker.scheduleWithFixedDelay(helper::tick, 0, 500, TimeUnit.MILLISECONDS);
+            helper.maintenance.scheduleWithFixedDelay(helper::maintain, 0, 10, TimeUnit.SECONDS);
             new Thread(helper::serve, "byd-helper-control").start();
             Runtime.getRuntime().addShutdownHook(new Thread(helper::shutdown));
             Looper.loop();
         } catch (Exception e) {
             Log.e("TailscaleBYD", "Power helper could not start", e);
+            Process.killProcess(Process.myPid());
         }
     }
 
@@ -75,21 +92,45 @@ public final class BydPowerHelper {
             platform.holdLocks(keepWifi);
             state.tick(true, keepWifi, platform.powerLevel(), platform.screenOn(), SystemClock.elapsedRealtime());
             long now = SystemClock.elapsedRealtime();
-            if (now - heartbeat >= 30000 && now - lastRecovery >= 30000) {
-                lastRecovery = now;
-                // Exit after uninstall or APK replacement; the new app launches its own code.
-                if (!apkPath.equals(context.getPackageManager()
-                        .getApplicationInfo(context.getPackageName(), 0).sourceDir)) {
+            if (now - lastFileHeartbeat >= 5000) {
+                runtime.heartbeat();
+                lastFileHeartbeat = now;
+            }
+            long sleep = now - SystemClock.uptimeMillis();
+            long suspended = Math.max(0, sleep - previousSleep);
+            // Separate clock reads have small jitter; report only meaningful suspend episodes.
+            if (suspended >= 30000) suspendMs += suspended;
+            previousSleep = sleep;
+        } catch (Exception e) {
+            Log.w("TailscaleBYD", "Power helper tick failed", e);
+        }
+    }
+
+    private void maintain() {
+        if (!alive) return;
+        try {
+            // Updates must be checked even when the updated app keeps sending heartbeats.
+            if (!apkPath.equals(context.getPackageManager()
+                    .getApplicationInfo(context.getPackageName(), 0).sourceDir)) {
+                shutdown();
+                return;
+            }
+            long now = SystemClock.elapsedRealtime();
+            if (now - lastPreferenceCheck >= 60000) {
+                lastPreferenceCheck = now;
+                String wifi = BydRuntimeFiles.desiredConfig(context.getPackageName(), token);
+                if (wifi == null) {
+                    runtime.disable();
                     shutdown();
                     return;
                 }
-                // Use am's genuine shell attribution; a package Context does not change UID.
-                new Thread(this::recoverVpn, "byd-vpn-recovery").start();
+                keepWifi = wifi.equals("1");
             }
+            if (alive && recovery.shouldRecover(now)) recoverVpn();
         } catch (PackageManager.NameNotFoundException e) {
             shutdown();
         } catch (Exception e) {
-            Log.w("TailscaleBYD", "Power helper tick failed", e);
+            Log.w("TailscaleBYD", "Helper maintenance failed: " + e.getClass().getSimpleName());
         }
     }
 
@@ -121,14 +162,16 @@ public final class BydPowerHelper {
                         line.substring(0, separator).getBytes(StandardCharsets.UTF_8))) continue;
                 String command = line.substring(separator + 1);
                 boolean stop = command.equals("STOP");
-                if (command.equals("CONFIG 1") || command.equals("CONFIG 0")) {
-                    keepWifi = command.endsWith("1");
-                    heartbeat = SystemClock.elapsedRealtime();
-                } else if (command.equals("PING")) heartbeat = SystemClock.elapsedRealtime();
-                else if (!stop && !command.equals("STATUS")) continue;
+                boolean restart = command.equals("RESTART");
+                if (command.matches("CONFIG [01] [01]")) {
+                    keepWifi = command.charAt(7) == '1';
+                    recovery.heartbeat(SystemClock.elapsedRealtime(), command.charAt(9) == '1');
+                } else if (command.equals("PING")) recovery.heartbeat(SystemClock.elapsedRealtime(), false);
+                else if (!stop && !restart && !command.equals("STATUS")) continue;
+                if (stop) runtime.disable();
                 client.getOutputStream().write((status().toString() + "\n").getBytes(StandardCharsets.UTF_8));
                 client.getOutputStream().flush();
-                if (stop) shutdown();
+                if (stop || restart) shutdown();
             } catch (Exception e) {
                 if (alive) Log.w("TailscaleBYD", "Helper client disconnected: " + e.getClass().getSimpleName());
             }
@@ -136,17 +179,21 @@ public final class BydPowerHelper {
     }
 
     private JSONObject status() throws Exception {
-        return new JSONObject().put("protocol", 1).put("uid", Process.myUid())
+        return new JSONObject().put("protocol", 2).put("uid", Process.myUid())
+                .put("apkPath", apkPath).put("watchdogAlive", runtime.watchdogAlive())
+                .put("suspendMs", suspendMs)
                 .put("phase", state.phase().name())
                 .put("devicePower", context.checkSelfPermission("android.permission.DEVICE_POWER")
                         == PackageManager.PERMISSION_GRANTED)
-                .put("error", state.error() != null ? state.error() : platform.error());
+                .put("error", state.error() != null ? state.error()
+                        : state.phase() == ParkedPowerState.Phase.UNKNOWN ? platform.error() : null);
     }
 
     private synchronized void shutdown() {
         if (!alive) return;
         alive = false;
         ticker.shutdownNow();
+        maintenance.shutdownNow();
         platform.release();
         try { server.close(); } catch (IOException ignored) {}
         Process.killProcess(Process.myPid());

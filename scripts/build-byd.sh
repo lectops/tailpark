@@ -8,8 +8,10 @@ if [[ -z "${ANDROID_HOME:-}" ]]; then
     export ANDROID_HOME="${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}"
 fi
 python3 scripts/prepare-byd-signing.py
+mkdir -p outputs/tailscale-byd
+python3 scripts/test-byd-watchdog.py --report outputs/tailscale-byd/watchdog-tests.json
 make libtailscale
 (cd android && ./gradlew ktfmtCheck test lintVitalRelease assembleRelease)
 mkdir -p outputs/tailscale-byd
-cp android/build/outputs/apk/release/android-release.apk outputs/tailscale-byd/Tailscale-BYD-1.104.1-byd.1.apk
+cp android/build/outputs/apk/release/android-release.apk outputs/tailscale-byd/Tailscale-BYD-1.104.1-byd.2.apk
 python3 scripts/package-byd.py

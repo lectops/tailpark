@@ -4,6 +4,7 @@ package com.tailscale.ipn.byd;
 
 import static org.junit.Assert.*;
 import java.io.DataInputStream;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -19,6 +20,28 @@ import org.junit.Test;
 
 /** Exercises the client against a fake adbd on an ephemeral port; never contacts the car. */
 public class LocalAdbTest {
+    @Test public void stoppingNeverPromptsToPairAnUnauthorizedKey() throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try (ServerSocket server = new ServerSocket()) {
+            server.bind(new InetSocketAddress("127.0.0.1", 0));
+            Future<?> daemon = executor.submit(() -> {
+                try (Socket socket = server.accept()) {
+                    socket.setSoTimeout(3000);
+                    assertEquals(0x4e584e43, read(socket).getInt(0));
+                    send(socket, 0x48545541, 1, 0, new byte[20]);
+                    assertEquals(2, read(socket).getInt(4));
+                    send(socket, 0x48545541, 1, 0, new byte[20]);
+                    assertEquals(-1, socket.getInputStream().read());
+                } catch (Exception e) { throw new RuntimeException(e); }
+            });
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            assertThrows(IOException.class, () -> LocalAdb.launch(
+                    new AdbKey(generator.generateKeyPair()), "stop-helper", server.getLocalPort(), false));
+            daemon.get(5, TimeUnit.SECONDS);
+        } finally { executor.shutdownNow(); }
+    }
+
     @Test public void newlyAuthorizedKeyLaunchesDetachedCommand() throws Exception {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try (ServerSocket server = new ServerSocket()) {

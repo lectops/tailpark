@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.DEVICE_POWER" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.BYDAUTO_BODYWORK_GET" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission
@@ -122,6 +123,7 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="${applicationId}.BYD_RECOVER" />
                 <action android:name="${applicationId}.BYD_BOOTSTRAP" />
+                <action android:name="${applicationId}.BYD_HELPER_CHECK" />
             </intent-filter>
         </receiver>
 
@@ -130,7 +132,7 @@
             android:exported="false" />
 
         <receiver
-            android:name=".MDMSettingsChangedReceiver"
+            android:name=".mdm.MDMSettingsChangedReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.APPLICATION_RESTRICTIONS_CHANGED" />

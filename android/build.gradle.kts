@@ -27,7 +27,7 @@ android {
     targetSdk = androidApiLevel
 
     versionCode = computeVersionCode()
-    versionName = getVersionProperty("VERSION_LONG") + "-byd.1"
+    versionName = getVersionProperty("VERSION_LONG") + "-byd.2"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     buildConfigField(

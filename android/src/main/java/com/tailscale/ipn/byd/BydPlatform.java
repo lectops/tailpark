@@ -6,24 +6,43 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.wifi.WifiManager;
+import android.os.Binder;
+import android.os.IBinder;
 import android.os.PowerManager;
+import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 
 /** Reflects the actual BYD framework; no OEM placeholder classes are shipped in the APK. */
+@SuppressLint({"PrivateApi", "DiscouragedPrivateApi"})
 public final class BydPlatform implements ParkedPowerState.Actions {
     private final Context context;
     private final PowerManager powerManager;
     private final WifiManager wifiManager;
     private final PowerManager.WakeLock wakeLock;
     private final WifiManager.WifiLock wifiLock;
+    private final ConnectivityManager connectivity;
+    private final BydPanelControl panel;
+    private final IBinder displayToken = new Binder();
     private Object bodywork;
     private Method powerGetter;
     private Method wakeMethod;
-    private Method backlightMethod;
+    private final Method[] backlightMethods = new Method[2];
+    private final boolean[] backlightResolved = new boolean[2];
+    private Method screenGetter;
+    private boolean screenResolved;
+    private Object setting;
+    private Object powerService;
+    private Method lockedOn;
+    private Method lockedOff;
+    private boolean lockResolved;
     private long nextBodyworkAttempt;
     private long lastWakeLock;
     private String lastError;
@@ -33,12 +52,26 @@ public final class BydPlatform implements ParkedPowerState.Actions {
         this.context = new BydContext(context);
         powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+        connectivity = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 context.getPackageName() + ":parked");
         wakeLock.setReferenceCounted(false);
         wifiLock = wifiManager == null ? null : wifiManager.createWifiLock(
                 WifiManager.WIFI_MODE_FULL_HIGH_PERF, context.getPackageName() + ":parked-wifi");
         if (wifiLock != null) wifiLock.setReferenceCounted(false);
+        panel = new BydPanelControl(new BydPanelControl.Device() {
+            @Override public Integer powerLevel() { return BydPlatform.this.powerLevel(); }
+            @Override public Integer screenStatus() { return BydPlatform.this.screenStatus(); }
+            @Override public boolean plainBacklight(boolean on) { return setPlainBacklight(on); }
+            @Override public boolean supportsDisplayLock() { return resolveDisplayLock(); }
+            @Override public void lockedBacklight(boolean on) {
+                try {
+                    if (!resolveDisplayLock()) throw new IllegalStateException("Vendor display lock unavailable");
+                    if (on) lockedOn.invoke(powerService, displayToken, "TailscaleBYD");
+                    else lockedOff.invoke(powerService, displayToken);
+                } catch (Exception e) { throw failure("Restore display lock", e); }
+            }
+        });
     }
 
     public static boolean available() {
@@ -64,12 +97,30 @@ public final class BydPlatform implements ParkedPowerState.Actions {
             return level >= 0 && level <= 4 ? level : null;
         } catch (Exception e) {
             record("Read car power", e);
+            bodywork = null;
+            nextBodyworkAttempt = SystemClock.elapsedRealtime() + 5000;
             return null;
         }
     }
 
     @SuppressWarnings("deprecation")
-    public Boolean screenOn() { return powerManager.isScreenOn(); }
+    public Boolean screenOn() {
+        Integer status = screenStatus();
+        return status == null ? powerManager.isScreenOn() : status == 1;
+    }
+
+    public Integer screenStatus() {
+        try {
+            if (!screenResolved) {
+                screenResolved = true;
+                try { screenGetter = PowerManager.class.getMethod("getPowerScreenStatus"); }
+                catch (NoSuchMethodException ignored) { }
+            }
+            if (screenGetter == null) return null;
+            int value = ((Number) screenGetter.invoke(powerManager)).intValue();
+            return value == 0 || value == 1 ? value : null;
+        } catch (Exception e) { record("Read display state", e); return null; }
+    }
 
     @Override public void wake() {
         try {
@@ -80,23 +131,76 @@ public final class BydPlatform implements ParkedPowerState.Actions {
     }
 
     @Override public void backlightOff() {
+        panel.darken();
+    }
+
+    @Override public boolean restoreDisplay() { return panel.restore(false); }
+
+    private boolean setPlainBacklight(boolean on) {
+        int index = on ? 1 : 0;
         try {
-            if (backlightMethod == null) {
-                try { backlightMethod = PowerManager.class.getMethod("TurnBacklightOff", long.class); }
-                catch (NoSuchMethodException e) {
-                    backlightMethod = PowerManager.class.getMethod("turnBacklightOff", long.class);
+            if (!backlightResolved[index]) {
+                backlightResolved[index] = true;
+                String suffix = on ? "On" : "Off";
+                for (String prefix : new String[]{"TurnBacklight", "turnBacklight"}) {
+                    try {
+                        backlightMethods[index] = PowerManager.class.getMethod(prefix + suffix, long.class);
+                        break;
+                    } catch (NoSuchMethodException ignored) { }
                 }
             }
-            backlightMethod.invoke(powerManager, SystemClock.uptimeMillis());
-        } catch (Exception e) { throw failure("Keep display dark", e); }
+            if (backlightMethods[index] != null) {
+                backlightMethods[index].invoke(powerManager, SystemClock.uptimeMillis());
+                return true;
+            }
+        } catch (Exception e) { record("Set display backlight", e); }
+        try {
+            Class<?> type = Class.forName("android.hardware.bydauto.setting.BYDAutoSettingDevice",
+                    true, PowerManager.class.getClassLoader());
+            if (setting == null) setting = type.getMethod("getInstance", Context.class).invoke(null, context);
+            if (setting != null) {
+                type.getMethod(on ? "turnBacklightOn" : "turnBacklightOff").invoke(setting);
+                return true;
+            }
+        } catch (Exception e) { record("Set OEM display backlight", e); }
+        return false;
+    }
+
+    private boolean resolveDisplayLock() {
+        if (!lockResolved) {
+            try {
+                Field service = PowerManager.class.getDeclaredField("mService");
+                service.setAccessible(true);
+                powerService = service.get(powerManager);
+                lockedOn = powerService.getClass().getMethod("TurnBacklightOnWithLock", IBinder.class, String.class);
+                lockedOff = powerService.getClass().getMethod("TurnBacklightOffWithLock", IBinder.class);
+                lockResolved = true;
+            } catch (NoSuchFieldException | NoSuchMethodException e) {
+                lockResolved = true;
+                lockedOn = null;
+                lockedOff = null;
+            } catch (Exception e) { record("Resolve display lock", e); }
+        }
+        return lockedOn != null && lockedOff != null;
     }
 
     @SuppressLint("MissingPermission")
     @SuppressWarnings("deprecation")
     @Override public void enableWifi() {
-        if (wifiManager != null && !wifiManager.isWifiEnabled() && !wifiManager.setWifiEnabled(true)) {
-            throw new IllegalStateException("Car firmware refused Wi-Fi retention");
+        if (!Integer.valueOf(0).equals(powerLevel())) return;
+        if (wifiManager == null) throw new IllegalStateException("Wi-Fi service unavailable");
+        if (wifiManager.isWifiEnabled()) return;
+        try {
+            if (wifiManager.setWifiEnabled(true)) return;
+        } catch (RuntimeException e) {
+            if (Process.myUid() != 2000) throw e;
         }
+        if (Process.myUid() == 2000) {
+            try {
+                if (BydShell.run(5, "/system/bin/svc", "wifi", "enable").exitCode == 0) return;
+            } catch (Exception e) { throw failure("Restore Wi-Fi", e); }
+        }
+        throw new IllegalStateException("Car firmware refused Wi-Fi retention");
     }
 
     @SuppressLint("WakelockTimeout")
@@ -107,17 +211,30 @@ public final class BydPlatform implements ParkedPowerState.Actions {
             wakeLock.acquire(60000);
             lastWakeLock = now;
         }
-        boolean connectedWifi = keepWifi && wifiManager != null && wifiManager.isWifiEnabled()
-                && wifiManager.getConnectionInfo().getNetworkId() >= 0;
+        boolean connectedWifi = keepWifi && wifiConnected();
         if (wifiLock != null) {
             if (connectedWifi && !wifiLock.isHeld()) wifiLock.acquire();
             else if (!connectedWifi && wifiLock.isHeld()) wifiLock.release();
         }
     }
 
-    public synchronized void release() {
-        if (wakeLock.isHeld()) wakeLock.release();
-        if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+    @SuppressWarnings("deprecation")
+    private boolean wifiConnected() {
+        if (connectivity == null) return false;
+        for (Network network : connectivity.getAllNetworks()) {
+            NetworkCapabilities capabilities = connectivity.getNetworkCapabilities(network);
+            if (capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return true;
+        }
+        return false;
+    }
+
+    public void release() {
+        try { panel.restore(true); }
+        catch (RuntimeException e) { Log.w("TailscaleBYD", "Display restoration failed", e); }
+        synchronized (this) {
+            if (wakeLock.isHeld()) wakeLock.release();
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        }
     }
 
     public synchronized String error() { return lastError; }

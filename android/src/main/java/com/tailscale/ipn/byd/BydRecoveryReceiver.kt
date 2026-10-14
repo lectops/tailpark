@@ -13,6 +13,27 @@ import java.security.MessageDigest
 /** Boot/update recovery plus a DUMP-protected entrypoint for our shell helper. */
 class BydRecoveryReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
+    if (intent.action == "${context.packageName}.BYD_HELPER_CHECK") {
+      val token = intent.getStringExtra("token")
+      resultData =
+          if (
+              token == null ||
+                  !MessageDigest.isEqual(
+                      token.toByteArray(),
+                      BydPreferences.token(context).toByteArray(),
+                  )
+          ) {
+            "REJECTED"
+          } else if (!BydPreferences.shouldResume(context)) {
+            "DISABLED"
+          } else if (BydPreferences.prefs(context).getBoolean("keep_wifi", true)) {
+            "READY_WIFI"
+          } else {
+            "READY_CELLULAR"
+          }
+      resultCode = -1
+      return
+    }
     if (intent.action == "${context.packageName}.BYD_BOOTSTRAP") {
       if (BydPreferences.shouldResume(context)) {
         resultData =

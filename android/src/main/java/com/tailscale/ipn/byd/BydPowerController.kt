@@ -5,18 +5,12 @@ package com.tailscale.ipn.byd
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
-import java.security.KeyFactory
-import java.security.KeyPair
-import java.security.KeyPairGenerator
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
-import java.util.Base64
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 
 /** Owns app locks and negotiates the detached shell helper while a VPN session is requested. */
-class BydPowerController(private val context: Context) {
+class BydPowerController(private val context: Context, private val vpnActive: () -> Boolean) {
   private val executor = Executors.newScheduledThreadPool(2)
   private val platform = BydPlatform(context)
   private val state = ParkedPowerState(platform)
@@ -61,8 +55,10 @@ class BydPowerController(private val context: Context) {
             platform.screenOn(),
             SystemClock.elapsedRealtime(),
         )
-        BydPreferences.status.value =
-            setupMessage ?: describe(state.phase().name, state.error() ?: platform.error())
+        val error =
+            state.error()
+                ?: if (state.phase() == ParkedPowerState.Phase.UNKNOWN) platform.error() else null
+        BydPreferences.status.value = setupMessage ?: describe(state.phase().name, error)
       }
     } catch (e: Exception) {
       BydPreferences.status.value = "Parked connectivity: ${e.message}"
@@ -72,17 +68,33 @@ class BydPowerController(private val context: Context) {
 
   private fun connectHelper() {
     if (!running || !BydPreferences.shouldResume(context)) return
-    val config =
-        if (BydPreferences.prefs(context).getBoolean("keep_wifi", true)) "CONFIG 1" else "CONFIG 0"
+    val wifi = if (BydPreferences.prefs(context).getBoolean("keep_wifi", true)) "1" else "0"
+    val health = if (vpnActive()) "1" else "0"
+    val config = "CONFIG $wifi $health"
     try {
+      val status = BydHelperConnection.request(context, "STATUS")
+      if (
+          status.optInt("protocol") != 2 ||
+              status.optString("apkPath") != context.applicationInfo.sourceDir
+      ) {
+        BydHelperConnection.request(
+            context,
+            if (status.optInt("protocol") >= 2) "RESTART" else "STOP",
+        )
+        throw IllegalStateException("Reloading parked helper")
+      }
       helper = BydHelperConnection.request(context, config)
       setupMessage = null
-      return
+      if (status.optBoolean("watchdogAlive")) return
     } catch (_: Exception) {
       helper = null
     }
     try {
-      LocalAdb.launch(adbKey(), BydHelperConnection.launchCommand(context))
+      BydAdb.restoreListener(context)
+      LocalAdb.launch(
+          requireNotNull(BydAdb.key(context)),
+          BydHelperConnection.launchCommand(context),
+      )
       if (!BydPreferences.shouldResume(context)) {
         BydHelperConnection.stopAsync(context)
         return
@@ -99,40 +111,6 @@ class BydPowerController(private val context: Context) {
             else -> e.message ?: "Parked connectivity setup is pending"
           }
     }
-  }
-
-  private fun adbKey(): AdbKey {
-    val prefs = BydPreferences.prefs(context)
-    val privateKey = prefs.getString("adb_private", null)
-    val publicKey = prefs.getString("adb_public", null)
-    val pair =
-        if (privateKey != null && publicKey != null) {
-          val factory = KeyFactory.getInstance("RSA")
-          KeyPair(
-              factory.generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(publicKey))),
-              factory.generatePrivate(PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKey))),
-          )
-        } else {
-          KeyPairGenerator.getInstance("RSA")
-              .apply { initialize(2048) }
-              .generateKeyPair()
-              .also {
-                check(
-                    prefs
-                        .edit()
-                        .putString(
-                            "adb_private",
-                            Base64.getEncoder().encodeToString(it.private.encoded),
-                        )
-                        .putString(
-                            "adb_public",
-                            Base64.getEncoder().encodeToString(it.public.encoded),
-                        )
-                        .commit()
-                )
-              }
-        }
-    return AdbKey(pair)
   }
 
   @Synchronized

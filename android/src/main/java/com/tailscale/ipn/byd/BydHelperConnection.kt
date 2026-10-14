@@ -6,9 +6,14 @@ import android.content.Context
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
 import org.json.JSONObject
 
 object BydHelperConnection {
+  private val stopExecutor = Executors.newSingleThreadExecutor { task ->
+    Thread(task, "byd-stop").apply { isDaemon = true }
+  }
+
   fun request(context: Context, command: String): JSONObject =
       Socket().use { socket ->
         socket.soTimeout = 1500
@@ -22,17 +27,32 @@ object BydHelperConnection {
       }
 
   fun stopAsync(context: Context) {
-    Thread({ runCatching { request(context, "STOP") } }, "byd-stop").apply {
-      isDaemon = true
-      start()
+    val appContext = context.applicationContext
+    stopExecutor.execute {
+      // A reconnect may have superseded the queued stop.
+      if (BydPreferences.shouldResume(appContext)) return@execute
+      if (runCatching { request(appContext, "STOP") }.isSuccess) return@execute
+      runCatching {
+        val key = BydAdb.key(appContext, create = false) ?: return@runCatching
+        val directory = BydRuntimeFiles(appContext.packageName).directory.path
+        val command =
+            "umask 077; mkdir -p " +
+                quote(directory) +
+                " && chmod 700 " +
+                quote(directory) +
+                " && : > " +
+                quote("$directory/disabled")
+        LocalAdb.launch(key, command, false)
+      }
     }
   }
 
+  private fun quote(value: String) = "'" + value.replace("'", "'\\''") + "'"
+
   fun launchCommand(context: Context): String {
-    fun quote(value: String) = "'" + value.replace("'", "'\\''") + "'"
     return "nohup /system/bin/app_process -Djava.class.path=" +
         quote(context.applicationInfo.sourceDir) +
-        " /system/bin --nice-name=tsbyd-helper com.tailscale.ipn.byd.BydPowerHelper " +
+        " /system/bin --nice-name=tsbyd-setup com.tailscale.ipn.byd.BydHelperInstaller " +
         quote(context.packageName) +
         " " +
         quote(BydPreferences.token(context)) +

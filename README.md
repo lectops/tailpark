@@ -7,8 +7,8 @@ Based on [Tailscale Android](https://github.com/tailscale/tailscale-android) 1.1
 ## Parked connectivity
 
 - Keep Android awake after ACC off while controlling the display backlight separately.
-- Restore Wi-Fi while parked, with built-in cellular data also supported.
-- Run a detached power helper and recover the VPN when the head unit kills the app.
+- Recheck and restore Wi-Fi throughout parking, with built-in cellular data also supported.
+- Supervise the power helper, recover a missing VPN, and reload helper code after APK updates.
 - Stop parked operation when the user disconnects, signs out, revokes VPN permission, or disables the setting.
 - Recover after reboot or app replacement when the connection was previously requested.
 
@@ -29,7 +29,7 @@ Set `JAVA_HOME` and `ANDROID_HOME` for your installation, then run:
 bash scripts/build-byd.sh
 ```
 
-The build fetches the pinned Tailscale Go toolchain, builds the networking library, checks formatting, runs unit tests and release lint, and creates a signed APK in `outputs/tailscale-byd/`.
+The build fetches the pinned Tailscale Go toolchain, builds the networking library, checks formatting, runs unit tests, watchdog process tests and release lint, and creates a signed APK in `outputs/tailscale-byd/`.
 
 The signing key and its password are generated locally in `.signing/`. Preserve that directory for future APK updates. Signing material, credentials, generated APKs, and local build artifacts are excluded from Git.
 

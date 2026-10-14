@@ -233,6 +233,8 @@ build-unstripped-aar: tailscale.version $(GOBIN)/gomobile
 	@echo "Generated unstripped AAR: $(ABS_UNSTRIPPED_AAR)"
 
 $(UNSTRIPPED_AAR): build-unstripped-aar
+	@# Propagate the phony builder's updated file to extraction and repackaging.
+	@touch $(UNSTRIPPED_AAR)
 
 libgojni.so.unstripped: $(UNSTRIPPED_AAR)
 	@echo "Extracting libgojni.so from unstripped AAR..."

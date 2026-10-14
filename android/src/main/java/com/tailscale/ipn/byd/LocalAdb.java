@@ -17,10 +17,18 @@ public final class LocalAdb {
     private static final int OKAY = 0x59414b4f, WRTE = 0x45545257, CLSE = 0x45534c43;
 
     public static void launch(AdbKey key, String command) throws Exception {
-        launch(key, command, 5555);
+        launch(key, command, 5555, true);
+    }
+
+    public static void launch(AdbKey key, String command, boolean allowPairing) throws Exception {
+        launch(key, command, 5555, allowPairing);
     }
 
     static void launch(AdbKey key, String command, int port) throws Exception {
+        launch(key, command, port, true);
+    }
+
+    static void launch(AdbKey key, String command, int port, boolean allowPairing) throws Exception {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("127.0.0.1", port), 1000);
             socket.setSoTimeout(5000);
@@ -37,7 +45,7 @@ public final class LocalAdb {
                 if (!signatureSent) {
                     send(socket, AUTH, 2, 0, key.sign(packet.payload));
                     signatureSent = true;
-                } else if (!publicSent) {
+                } else if (!publicSent && allowPairing) {
                     send(socket, AUTH, 3, 0, key.publicKey());
                     publicSent = true;
                 } else throw new IOException("Allow the Android debugging request on the car display");
