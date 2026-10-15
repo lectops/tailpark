@@ -21,6 +21,14 @@ final class BydRuntimeFiles {
 
     File file(String name) { return new File(directory, name); }
 
+    void preserveStatusBeforeRestart() throws IOException {
+        File previous = file("last-status.json");
+        if (previous.isFile()) {
+            write("previous-status.json", new String(Files.readAllBytes(previous.toPath()),
+                    StandardCharsets.UTF_8));
+        }
+    }
+
     void write(String name, String value) throws IOException {
         File temporary = file(name + ".new." + Process.myPid());
         Files.write(temporary.toPath(), value.getBytes(StandardCharsets.UTF_8));
@@ -57,6 +65,16 @@ final class BydRuntimeFiles {
     }
 
     static String desiredConfig(String packageName, String token) throws IOException, InterruptedException {
+        try {
+            return queryDesiredConfig(packageName, token);
+        } catch (IOException ignored) {
+            // SSC blocks a cold receiver. A protected no-window activity can start our own service.
+            BydRecoveryCommands.startActivity(packageName, token);
+            return queryDesiredConfig(packageName, token);
+        }
+    }
+
+    private static String queryDesiredConfig(String packageName, String token) throws IOException, InterruptedException {
         BydShell.Result result = BydShell.run(15, "/system/bin/am", "broadcast",
                 "--receiver-foreground", "--include-stopped-packages", "-n",
                 packageName + "/com.tailscale.ipn.byd.BydRecoveryReceiver", "-a",

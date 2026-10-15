@@ -49,24 +49,42 @@ class BydRecoveryReceiver : BroadcastReceiver() {
       return
     }
     if (intent.action == "${context.packageName}.BYD_RECOVER") {
-      val token = intent.getStringExtra("token") ?: return
-      if (!MessageDigest.isEqual(token.toByteArray(), BydPreferences.token(context).toByteArray()))
-          return
+      val token = intent.getStringExtra("token")
+      if (
+          token == null ||
+              !MessageDigest.isEqual(
+                  token.toByteArray(),
+                  BydPreferences.token(context).toByteArray(),
+              )
+      ) {
+        resultData = "REJECTED"
+        resultCode = -1
+        return
+      }
     } else if (
         intent.action != Intent.ACTION_BOOT_COMPLETED &&
             intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
     ) {
       return
     }
-    if (!BydPreferences.shouldResume(context)) {
-      BydHelperConnection.stopAsync(context)
-      return
-    }
-    val app = UninitializedApp.get()
-    if (app.isAbleToStartVPN() && VpnService.prepare(context) == null) app.startVPN()
-    else {
+    resultData = resumeVpn(context)
+    resultCode = -1
+  }
+
+  companion object {
+    internal fun resumeVpn(context: Context): String {
+      if (!BydPreferences.shouldResume(context)) {
+        BydHelperConnection.stopAsync(context)
+        return "DISABLED"
+      }
+      val app = UninitializedApp.get()
+      if (app.isAbleToStartVPN() && VpnService.prepare(context) == null) {
+        app.startVPN()
+        return "RECOVERING"
+      }
       // Permission or login was revoked. Do not keep a power helper running without a usable VPN.
       BydPreferences.setWanted(context, false)
+      return "UNAVAILABLE"
     }
   }
 }

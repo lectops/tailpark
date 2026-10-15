@@ -11,7 +11,7 @@ import zipfile
 
 root = Path(__file__).resolve().parents[1]
 output = root / "outputs/tailscale-byd"
-apk = output / "Tailscale-BYD-1.104.1-byd.2.apk"
+apk = output / "Tailscale-BYD-1.104.1-byd.4.apk"
 sdk = Path(os.environ.get("ANDROID_SDK_ROOT", Path.home() / "Library/Android/sdk"))
 tools = sdk / "build-tools/36.0.0"
 verification = subprocess.run([str(tools / "apksigner"), "verify", "--verbose", "--print-certs", str(apk)],
@@ -22,7 +22,7 @@ assert "package: name='dev.tailscale.byd'" in badging
 assert "application-label:'Tailscale BYD'" in badging
 assert "sdkVersion:'26'" in badging
 assert "arm64-v8a" in badging
-assert "-byd.2" in badging
+assert "-byd.4" in badging
 aar = root / "android/libs/libtailscale.aar"
 go_inputs = list((root / "libtailscale").rglob("*.go")) + [root / "go.mod", root / "go.sum"]
 assert aar.stat().st_mtime >= max(path.stat().st_mtime for path in go_inputs), "Go AAR is older than its source"
@@ -43,7 +43,7 @@ assert watchdog_tests["tests"] > 0 and watchdog_tests["failures"] == 0 and watch
 (output / "package-metadata.txt").write_text(badging)
 (output / "build-manifest.json").write_text(json.dumps({
     "package": "dev.tailscale.byd", "label": "Tailscale BYD", "upstream": "1.104.1",
-    "byd_version": 2, "apk": apk.name, "sha256": sha, "bytes": apk.stat().st_size,
+    "byd_version": 4, "apk": apk.name, "sha256": sha, "bytes": apk.stat().st_size,
     "implementation": "BYD parked connectivity with supervised helper and recurring network recovery",
     "unit_tests": tests,
     "watchdog_tests": watchdog_tests,

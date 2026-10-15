@@ -39,6 +39,10 @@ public final class BydPowerHelper {
     private long lastFileHeartbeat;
     private long lastPreferenceCheck;
     private volatile long suspendMs;
+    private volatile Integer observedPower;
+    private volatile Boolean observedScreenOn;
+    private volatile long lastTickAt;
+    private volatile String tickError;
     private long previousSleep = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis();
 
     private BydPowerHelper(Context context, String token) throws IOException, PackageManager.NameNotFoundException {
@@ -50,6 +54,8 @@ public final class BydPowerHelper {
         server = new ServerSocket();
         server.setReuseAddress(true);
         server.bind(new InetSocketAddress("127.0.0.1", PORT));
+        try { runtime.preserveStatusBeforeRestart(); }
+        catch (IOException e) { Log.w("TailscaleBYD", "Previous helper status could not be retained"); }
         runtime.write("helper.pid", Integer.toString(Process.myPid()));
         runtime.write("helper.apk", apkPath);
         runtime.write("helper.identity", BydRuntimeFiles.fingerprint(token));
@@ -90,10 +96,16 @@ public final class BydPowerHelper {
         if (!alive) return;
         try {
             platform.holdLocks(keepWifi);
-            state.tick(true, keepWifi, platform.powerLevel(), platform.screenOn(), SystemClock.elapsedRealtime());
+            observedPower = platform.powerLevel();
+            observedScreenOn = platform.screenOn();
+            state.tick(true, keepWifi, observedPower, observedScreenOn, SystemClock.elapsedRealtime());
             long now = SystemClock.elapsedRealtime();
+            lastTickAt = now;
+            tickError = null;
             if (now - lastFileHeartbeat >= 5000) {
                 runtime.heartbeat();
+                // Remains available after connectivity is lost or Android restarts.
+                runtime.write("last-status.json", status().toString() + "\n");
                 lastFileHeartbeat = now;
             }
             long sleep = now - SystemClock.uptimeMillis();
@@ -102,6 +114,9 @@ public final class BydPowerHelper {
             if (suspended >= 30000) suspendMs += suspended;
             previousSleep = sleep;
         } catch (Exception e) {
+            tickError = e.getClass().getSimpleName();
+            try { runtime.write("last-status.json", status().toString() + "\n"); }
+            catch (Exception ignored) { }
             Log.w("TailscaleBYD", "Power helper tick failed", e);
         }
     }
@@ -135,20 +150,10 @@ public final class BydPowerHelper {
     }
 
     private void recoverVpn() {
-        java.lang.Process process = null;
         try {
-            process = new ProcessBuilder("/system/bin/am", "broadcast", "--receiver-foreground",
-                    "--include-stopped-packages", "-n", context.getPackageName()
-                    + "/com.tailscale.ipn.byd.BydRecoveryReceiver", "-a",
-                    context.getPackageName() + ".BYD_RECOVER", "--es", "token", token)
-                    .redirectOutput(ProcessBuilder.Redirect.to(new java.io.File("/dev/null")))
-                    .redirectError(ProcessBuilder.Redirect.to(new java.io.File("/dev/null")))
-                    .start();
-            if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroy();
+            BydRecoveryCommands.recover(context.getPackageName(), token);
         } catch (Exception e) {
             Log.w("TailscaleBYD", "VPN recovery failed: " + e.getClass().getSimpleName());
-        } finally {
-            if (process != null && process.isAlive()) process.destroy();
         }
     }
 
@@ -182,6 +187,12 @@ public final class BydPowerHelper {
         return new JSONObject().put("protocol", 2).put("uid", Process.myUid())
                 .put("apkPath", apkPath).put("watchdogAlive", runtime.watchdogAlive())
                 .put("suspendMs", suspendMs)
+                .put("powerLevel", observedPower == null ? JSONObject.NULL : observedPower)
+                .put("screenOn", observedScreenOn == null ? JSONObject.NULL : observedScreenOn)
+                .put("sampledAtElapsedMs", lastTickAt)
+                .put("sampleAgeMs", lastTickAt == 0 ? JSONObject.NULL
+                        : Math.max(0, SystemClock.elapsedRealtime() - lastTickAt))
+                .put("tickError", tickError == null ? JSONObject.NULL : tickError)
                 .put("phase", state.phase().name())
                 .put("devicePower", context.checkSelfPermission("android.permission.DEVICE_POWER")
                         == PackageManager.PERMISSION_GRANTED)

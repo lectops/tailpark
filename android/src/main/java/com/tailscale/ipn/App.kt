@@ -270,6 +270,15 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
 
   fun setWantRunning(wantRunning: Boolean, onSuccess: (() -> Unit)? = null) {
     BydPreferences.setWanted(this, wantRunning)
+    editWantRunning(wantRunning, onSuccess)
+  }
+
+  /** Keep parked power requested while the backend pauses for an internal VPN restart. */
+  fun pauseBackendForVpnRestart(onSuccess: () -> Unit) {
+    editWantRunning(false, onSuccess)
+  }
+
+  private fun editWantRunning(wantRunning: Boolean, onSuccess: (() -> Unit)?) {
     val callback: (Result<Ipn.Prefs>) -> Unit = { result ->
       result.fold(
           onSuccess = { onSuccess?.invoke() },

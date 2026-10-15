@@ -67,9 +67,10 @@ open class IPNService : VpnService(), libtailscale.IPNService {
           START_NOT_STICKY
         }
         ACTION_RESTART_VPN -> {
-          app.setWantRunning(false) {
+          app.pauseBackendForVpnRestart {
             close()
-            app.startVPN()
+            // A deliberate disconnect may have superseded this asynchronous restart.
+            if (BydPreferences.prefs(this).getBoolean("wanted", false)) app.startVPN()
           }
           START_NOT_STICKY
         }

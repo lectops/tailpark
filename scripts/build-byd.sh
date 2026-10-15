@@ -13,5 +13,5 @@ python3 scripts/test-byd-watchdog.py --report outputs/tailscale-byd/watchdog-tes
 make libtailscale
 (cd android && ./gradlew ktfmtCheck test lintVitalRelease assembleRelease)
 mkdir -p outputs/tailscale-byd
-cp android/build/outputs/apk/release/android-release.apk outputs/tailscale-byd/Tailscale-BYD-1.104.1-byd.2.apk
+cp android/build/outputs/apk/release/android-release.apk outputs/tailscale-byd/Tailscale-BYD-1.104.1-byd.4.apk
 python3 scripts/package-byd.py

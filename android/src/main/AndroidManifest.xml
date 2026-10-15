@@ -104,6 +104,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.tailscale.ipn.byd.BydRecoveryActivity"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="" />
+
         <receiver
             android:name="IPNReceiver"
             android:exported="true">
