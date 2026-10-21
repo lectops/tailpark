@@ -7,6 +7,8 @@ fi
 if [[ -z "${ANDROID_HOME:-}" ]]; then
     export ANDROID_HOME="${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}"
 fi
+# Keep local build paths out of the native library.
+export GOFLAGS="${GOFLAGS:+$GOFLAGS }-trimpath"
 python3 scripts/prepare-byd-signing.py
 mkdir -p outputs/tailpark
 python3 scripts/test-byd-watchdog.py --report outputs/tailpark/watchdog-tests.json
