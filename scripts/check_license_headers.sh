@@ -20,7 +20,7 @@ EOF
 	fi
 	byd=$(
 		cat <<EOF
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 EOF
 	)

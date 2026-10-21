@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd
 
@@ -18,7 +18,7 @@ class BydRecoveryActivity : Activity() {
           return
       BydRecoveryReceiver.resumeVpn(this)
     } catch (e: Exception) {
-      Log.w("TailscaleBYD", "VPN recovery activity failed: ${e.javaClass.simpleName}")
+      Log.w("Tailpark", "VPN recovery activity failed: ${e.javaClass.simpleName}")
     } finally {
       // Theme.NoDisplay requires finishing before onResume, including rejection/error paths.
       finish()

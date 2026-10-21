@@ -67,3 +67,6 @@ tailscale.version
 
 # local tmp folder
 .tmp/
+
+# Retired signing identity for the pre-rename dev.tailscale.byd package
+.signing-tailscale-byd/

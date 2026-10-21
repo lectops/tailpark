@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd;
 
@@ -32,7 +32,7 @@ public final class LocalAdb {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("127.0.0.1", port), 1000);
             socket.setSoTimeout(5000);
-            send(socket, CNXN, 0x01000000, 4096, "host::tailscale-byd\0".getBytes(StandardCharsets.UTF_8));
+            send(socket, CNXN, 0x01000000, 4096, "host::tailpark\0".getBytes(StandardCharsets.UTF_8));
             boolean signatureSent = false;
             boolean publicSent = false;
             for (int attempts = 0; attempts < 8; attempts++) {

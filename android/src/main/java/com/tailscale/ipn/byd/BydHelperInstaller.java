@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd;
 
@@ -62,7 +62,7 @@ public final class BydHelperInstaller {
             }
         } catch (Exception e) {
             // Do not log command output or the installation token.
-            Log.e("TailscaleBYD", "Watchdog setup failed: " + e.getClass().getSimpleName());
+            Log.e("Tailpark", "Watchdog setup failed: " + e.getClass().getSimpleName());
         }
     }
 

@@ -25,9 +25,9 @@ if not keystore.exists():
     subprocess.run([
         keytool, "-genkeypair", "-noprompt", "-storetype", "JKS",
         "-keystore", str(keystore), "-storepass:file", str(password),
-        "-keypass:file", str(password), "-alias", "tailscale-byd",
+        "-keypass:file", str(password), "-alias", "tailpark",
         "-keyalg", "RSA", "-keysize", "3072", "-validity", "10000",
-        "-dname", "CN=Tailscale BYD, OU=Personal Build, O=Tailscale BYD",
+        "-dname", "CN=Tailpark, O=Tailpark",
     ], check=True)
     keystore.chmod(0o600)
 print("Persistent BYD signing key ready.")

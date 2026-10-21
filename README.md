@@ -1,18 +1,48 @@
-# Tailscale BYD
+# Tailpark
 
-An unofficial Tailscale Android client for BYD head units, with connectivity after ACC off while the display stays dark.
+Tailpark keeps your BYD head unit on your tailnet after you switch the car off, so you can reach it remotely while it's parked.
 
-Based on [Tailscale Android](https://github.com/tailscale/tailscale-android) 1.104.1. This project is independent of Tailscale Inc. and BYD.
+It is an unofficial fork of the [Tailscale Android client](https://github.com/tailscale/tailscale-android) 1.104.1 with a parked-connectivity controller added. Tailpark is not affiliated with or endorsed by Tailscale Inc. or BYD. "Tailscale" is a trademark of Tailscale Inc.
 
-## Parked connectivity
+## What it does
 
-- Keep Android awake after ACC off while controlling the display backlight separately.
-- Recheck and restore Wi-Fi throughout parking, with built-in cellular data also supported.
-- Supervise the power helper, recover a missing VPN, and reload helper code after APK updates.
-- Stop parked operation when the user disconnects, signs out, revokes VPN permission, or disables the setting.
-- Recover after reboot or app replacement when the connection was previously requested.
+- Keeps Android awake after ACC off while the display stays dark.
+- Rechecks and restores Wi-Fi while parked. Built-in cellular data also works.
+- Runs a supervised helper that brings the VPN back when BYD's power policy kills the app.
+- Stops parked operation when you disconnect, sign out, revoke VPN permission, or turn the setting off.
+- Resumes after a reboot or app update if you had connected before.
 
-The application ID is `dev.tailscale.byd`, so it installs alongside the official client. Only one Android VPN can be active at a time. **Stay connected while parked** is enabled by default.
+The package ID is `dev.tailpark.byd`, so it installs alongside the official Tailscale app. Android allows only one active VPN at a time.
+
+## Tested on
+
+| | |
+| --- | --- |
+| Vehicle | BYD Sealion 6 |
+| Head unit | DiLink 3.0, Android 10 |
+| Build | 1.104.1-byd.4 (pre-rename) for a week of daily use; 1.104.1-byd.5 for the release |
+
+Other DiLink versions and models may work but have not been tested. Reports are welcome.
+
+## Install
+
+Download the APK from [Releases](../../releases), install it through the car's file manager, sign in, and grant VPN permission. Keep Android debugging enabled and accept the debugging prompt from `tailpark@headunit`, which lets the app start its power helper.
+
+Full steps, including the optional ADB setup and moving from the pre-rename "Tailscale BYD" build, are in [docs/INSTALL.md](docs/INSTALL.md).
+
+## Limitations
+
+- **It needs internet where you park.** An underground basement with no cellular or Wi-Fi signal means no remote access until the car has signal again.
+- **It keeps the head unit running while parked.** 12 V battery drain has not been measured. Don't leave parked mode on for days without checking your battery.
+- Switching the car off interrupts the connection for roughly 35 seconds while the app recovers.
+- Reboot recovery and Wi-Fi/cellular handover while parked have not been tested in a structured way.
+- Android debugging must stay enabled on the head unit.
+
+See [docs/TESTING.md](docs/TESTING.md) for what has and hasn't been verified.
+
+## How it works
+
+BYD's ACC-off policy kills ordinary app processes. Tailpark starts a small helper as the shell user through a loopback ADB connection. That helper holds the wake and Wi-Fi locks, keeps the display dark, and restarts the VPN through a protected activity when it disappears. A separate watchdog restarts the helper if it crashes. Details are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
 
 ## Build
 
@@ -23,26 +53,16 @@ Required tools:
 - Android NDK 23.1.7779620
 - Python 3, Git, Make, and the Android SDK command-line tools
 
-Set `JAVA_HOME` and `ANDROID_HOME` for your installation, then run:
+Set `JAVA_HOME` and `ANDROID_HOME`, then run:
 
 ```sh
 bash scripts/build-byd.sh
 ```
 
-The build fetches the pinned Tailscale Go toolchain, builds the networking library, checks formatting, runs unit tests, watchdog process tests and release lint, and creates a signed APK in `outputs/tailscale-byd/`.
+The build fetches the pinned Tailscale Go toolchain, builds the networking library, checks formatting, runs unit tests, watchdog process tests and release lint, and writes a signed APK to `outputs/tailpark/`.
 
-The signing key and its password are generated locally in `.signing/`. Preserve that directory for future APK updates. Signing material, credentials, generated APKs, and local build artifacts are excluded from Git.
-
-## Install
-
-Install the APK, sign in, and grant VPN permission. Keep Android debugging enabled and accept the app's local debugging authorization request so it can start the power helper. An optional host ADB setup command is available if local authorization is unavailable.
-
-See [installation instructions](docs/BYD-INSTALL.md) and [implementation details](docs/BYD-IMPLEMENTATION-PLAN.md).
-
-## Compatibility and verification
-
-The initial build targets DiLink 3.0 on Android 10. The application and helper are compiled and covered by host tests; ACC-off behavior still requires verification on the head unit. Parked access depends on retained head-unit power, the helper's Android power permission, and an available internet connection. Parked power consumption should be measured on the vehicle.
+A signing key is generated in `.signing/` on first build. Keep that directory: Android only installs updates signed with the same key. Your own builds can't update the published release APK, and the reverse is also true.
 
 ## License
 
-BSD-3-Clause. Upstream Tailscale copyright and license notices are preserved; see [LICENSE](LICENSE). WireGuard is a registered trademark of Jason A. Donenfeld.
+BSD-3-Clause, the same as upstream. Tailscale copyright and license notices are preserved; see [LICENSE](LICENSE). WireGuard is a registered trademark of Jason A. Donenfeld.

@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd;
 
@@ -40,7 +40,7 @@ public final class AdbKey {
         buffer.put(littleEndian(BigInteger.ONE.shiftLeft(4096).mod(modulus)));
         buffer.putInt(publicKey.getPublicExponent().intValue());
         return (Base64.getEncoder().encodeToString(buffer.array())
-                + " tailscale-byd@headunit\0").getBytes(StandardCharsets.UTF_8);
+                + " tailpark@headunit\0").getBytes(StandardCharsets.UTF_8);
     }
 
     private static byte[] littleEndian(BigInteger value) {

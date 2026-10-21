@@ -22,12 +22,12 @@ android {
   compileSdk = androidApiLevel
 
   defaultConfig {
-    applicationId = "dev.tailscale.byd"
+    applicationId = "dev.tailpark.byd"
     minSdk = 26
     targetSdk = androidApiLevel
 
     versionCode = computeVersionCode()
-    versionName = getVersionProperty("VERSION_LONG") + "-byd.4"
+    versionName = getVersionProperty("VERSION_LONG") + "-byd.5"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     buildConfigField(
@@ -59,7 +59,7 @@ android {
       val password = if (passwordFile.exists()) passwordFile.readText().trim() else ""
       storePassword = password
       keyPassword = password
-      keyAlias = "tailscale-byd"
+      keyAlias = "tailpark"
     }
   }
 

@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd
 
@@ -62,7 +62,7 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
       }
     } catch (e: Exception) {
       BydPreferences.status.value = "Parked connectivity: ${e.message}"
-      Log.w("TailscaleBYD", "Parked controller", e)
+      Log.w("Tailpark", "Parked controller", e)
     }
   }
 

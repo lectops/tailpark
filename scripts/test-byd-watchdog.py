@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) Tailscale BYD contributors
+# Copyright (c) Tailpark contributors
 # SPDX-License-Identifier: BSD-3-Clause
 """Exercise the shipped POSIX watchdog with local fake Android commands."""
 import json
@@ -67,7 +67,7 @@ print("package:" + (pathlib.Path(os.environ["BYD_FIXTURE"]) / "test-apk").read_t
             '"/proc/$1/cmdline"', '"$DIR/test-proc/$1/cmdline"'
         ).replace("/system/bin/sh", "/bin/sh")
         self.prefix = (
-            "#!/bin/sh\nPKG=dev.tailscale.byd\nTOKEN=fixture-token\n"
+            "#!/bin/sh\nPKG=dev.tailpark.byd\nTOKEN=fixture-token\n"
             + "DIR='" + str(self.directory) + "'\nIDENTITY=fixture-identity\n"
         )
         self.script.write_text(self.prefix + self.body)

@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd;
 
@@ -55,7 +55,7 @@ public final class BydPowerHelper {
         server.setReuseAddress(true);
         server.bind(new InetSocketAddress("127.0.0.1", PORT));
         try { runtime.preserveStatusBeforeRestart(); }
-        catch (IOException e) { Log.w("TailscaleBYD", "Previous helper status could not be retained"); }
+        catch (IOException e) { Log.w("Tailpark", "Previous helper status could not be retained"); }
         runtime.write("helper.pid", Integer.toString(Process.myPid()));
         runtime.write("helper.apk", apkPath);
         runtime.write("helper.identity", BydRuntimeFiles.fingerprint(token));
@@ -87,7 +87,7 @@ public final class BydPowerHelper {
             Runtime.getRuntime().addShutdownHook(new Thread(helper::shutdown));
             Looper.loop();
         } catch (Exception e) {
-            Log.e("TailscaleBYD", "Power helper could not start", e);
+            Log.e("Tailpark", "Power helper could not start", e);
             Process.killProcess(Process.myPid());
         }
     }
@@ -117,7 +117,7 @@ public final class BydPowerHelper {
             tickError = e.getClass().getSimpleName();
             try { runtime.write("last-status.json", status().toString() + "\n"); }
             catch (Exception ignored) { }
-            Log.w("TailscaleBYD", "Power helper tick failed", e);
+            Log.w("Tailpark", "Power helper tick failed", e);
         }
     }
 
@@ -145,7 +145,7 @@ public final class BydPowerHelper {
         } catch (PackageManager.NameNotFoundException e) {
             shutdown();
         } catch (Exception e) {
-            Log.w("TailscaleBYD", "Helper maintenance failed: " + e.getClass().getSimpleName());
+            Log.w("Tailpark", "Helper maintenance failed: " + e.getClass().getSimpleName());
         }
     }
 
@@ -153,7 +153,7 @@ public final class BydPowerHelper {
         try {
             BydRecoveryCommands.recover(context.getPackageName(), token);
         } catch (Exception e) {
-            Log.w("TailscaleBYD", "VPN recovery failed: " + e.getClass().getSimpleName());
+            Log.w("Tailpark", "VPN recovery failed: " + e.getClass().getSimpleName());
         }
     }
 
@@ -178,7 +178,7 @@ public final class BydPowerHelper {
                 client.getOutputStream().flush();
                 if (stop || restart) shutdown();
             } catch (Exception e) {
-                if (alive) Log.w("TailscaleBYD", "Helper client disconnected: " + e.getClass().getSimpleName());
+                if (alive) Log.w("Tailpark", "Helper client disconnected: " + e.getClass().getSimpleName());
             }
         }
     }

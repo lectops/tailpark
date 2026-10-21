@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd;
 
@@ -67,7 +67,7 @@ public final class BydPlatform implements ParkedPowerState.Actions {
             @Override public void lockedBacklight(boolean on) {
                 try {
                     if (!resolveDisplayLock()) throw new IllegalStateException("Vendor display lock unavailable");
-                    if (on) lockedOn.invoke(powerService, displayToken, "TailscaleBYD");
+                    if (on) lockedOn.invoke(powerService, displayToken, "Tailpark");
                     else lockedOff.invoke(powerService, displayToken);
                 } catch (Exception e) { throw failure("Restore display lock", e); }
             }
@@ -230,7 +230,7 @@ public final class BydPlatform implements ParkedPowerState.Actions {
 
     public void release() {
         try { panel.restore(true); }
-        catch (RuntimeException e) { Log.w("TailscaleBYD", "Display restoration failed", e); }
+        catch (RuntimeException e) { Log.w("Tailpark", "Display restoration failed", e); }
         synchronized (this) {
             if (wakeLock.isHeld()) wakeLock.release();
             if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
@@ -248,7 +248,7 @@ public final class BydPlatform implements ParkedPowerState.Actions {
                 ? ((InvocationTargetException) e).getTargetException() : e;
         String message = operation + ": " + cause.getClass().getSimpleName()
                 + (cause.getMessage() == null ? "" : " — " + cause.getMessage());
-        if (!message.equals(lastError)) Log.w("TailscaleBYD", message);
+        if (!message.equals(lastError)) Log.w("Tailpark", message);
         lastError = message;
         return message;
     }

@@ -1,4 +1,4 @@
-// Copyright (c) Tailscale BYD contributors
+// Copyright (c) Tailpark contributors
 // SPDX-License-Identifier: BSD-3-Clause
 package com.tailscale.ipn.byd;
 
@@ -16,7 +16,7 @@ final class BydRuntimeFiles {
 
     BydRuntimeFiles(String packageName) {
         if (!packageName.matches("[A-Za-z0-9_.]+")) throw new IllegalArgumentException("Invalid package");
-        directory = new File("/data/local/tmp/tailscale-byd-" + packageName);
+        directory = new File("/data/local/tmp/tailpark-" + packageName);
     }
 
     File file(String name) { return new File(directory, name); }
