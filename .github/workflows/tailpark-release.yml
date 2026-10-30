@@ -1,0 +1,88 @@
+name: Tailpark stable releases
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tailpark-stable-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'lectops/tailpark'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NDK_ROOT: /usr/local/lib/android/sdk/ndk/23.1.7779620
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Configure release author
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Check upstream and prepare merge
+        id: prepare
+        run: python3 scripts/update-upstream.py
+      - name: Test release gates
+        run: python3 scripts/test-release-automation.py
+      - uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        if: steps.prepare.outputs.needed == 'true'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install pinned Android tools
+        if: steps.prepare.outputs.needed == 'true'
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;23.1.7779620"
+      - name: Restore existing release signer
+        if: steps.prepare.outputs.needed == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.TAILPARK_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.TAILPARK_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64"
+          test -n "$KEYSTORE_PASSWORD"
+          umask 077
+          mkdir -p .signing
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > .signing/byd.jks
+          printf '%s\n' "$KEYSTORE_PASSWORD" > .signing/password
+      - name: Build, test, lint and verify signed APK
+        if: steps.prepare.outputs.needed == 'true'
+        run: bash scripts/build-byd.sh
+      - name: Publish tested commit and release
+        if: steps.prepare.outputs.needed == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}
+          RELEASE_NAME: ${{ steps.prepare.outputs.name }}
+          APK_NAME: ${{ steps.prepare.outputs.apk }}
+          UPSTREAM_TAG: ${{ steps.prepare.outputs.upstream_tag }}
+        run: |
+          git diff --exit-code
+          git push origin HEAD:main
+          if git rev-parse --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$(git rev-parse HEAD)"
+          else
+            git tag "$RELEASE_TAG"
+            git push origin "$RELEASE_TAG"
+          fi
+          python3 scripts/release-notes.py > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" \
+            "outputs/tailpark/$APK_NAME" \
+            outputs/tailpark/SHA256.txt \
+            outputs/tailpark/build-manifest.json \
+            outputs/tailpark/signature-verification.txt \
+            outputs/tailpark/package-metadata.txt \
+            --verify-tag --latest --title "Tailpark $RELEASE_NAME" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+      - name: Remove signing material
+        if: always()
+        run: rm -rf .signing

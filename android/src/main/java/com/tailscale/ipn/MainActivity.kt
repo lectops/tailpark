@@ -67,6 +67,7 @@ import com.tailscale.ipn.ui.util.set
 import com.tailscale.ipn.ui.util.universalFit
 import com.tailscale.ipn.ui.view.AboutView
 import com.tailscale.ipn.ui.view.BugReportView
+import com.tailscale.ipn.ui.view.BydStartupPrompt
 import com.tailscale.ipn.ui.view.DNSSettingsView
 import com.tailscale.ipn.ui.view.ExitNodePicker
 import com.tailscale.ipn.ui.view.HealthView
@@ -240,6 +241,8 @@ class MainActivity : ComponentActivity() {
     appViewModel.directoryPickerLauncher = directoryPickerLauncher
 
     setContent {
+      val startupState by Notifier.state.collectAsState()
+      AppTheme { BydStartupPrompt(loggedIn = startupState > Ipn.State.NeedsMachineAuth) }
       var showDialog by remember { mutableStateOf(false) }
 
       LaunchedEffect(Unit) { appViewModel.triggerDirectoryPicker.collect { showDialog = true } }

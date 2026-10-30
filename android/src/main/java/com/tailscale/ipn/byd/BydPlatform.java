@@ -57,7 +57,7 @@ public final class BydPlatform implements ParkedPowerState.Actions {
                 context.getPackageName() + ":parked");
         wakeLock.setReferenceCounted(false);
         wifiLock = wifiManager == null ? null : wifiManager.createWifiLock(
-                WifiManager.WIFI_MODE_FULL_HIGH_PERF, context.getPackageName() + ":parked-wifi");
+                WifiManager.WIFI_MODE_FULL, context.getPackageName() + ":parked-wifi");
         if (wifiLock != null) wifiLock.setReferenceCounted(false);
         panel = new BydPanelControl(new BydPanelControl.Device() {
             @Override public Integer powerLevel() { return BydPlatform.this.powerLevel(); }

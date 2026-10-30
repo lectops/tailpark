@@ -91,6 +91,10 @@ public final class ParkedPowerState {
     }
 
     public synchronized Phase phase() { return phase; }
+    /** Keep the wake-to-dark transition responsive; stable operation needs fewer wakeups. */
+    public synchronized long nextPollDelayMillis() {
+        return phase == Phase.WAITING || phase == Phase.WAKING ? 500 : 5000;
+    }
     public synchronized String error() {
         return errors.isEmpty() ? null : errors.values().iterator().next();
     }

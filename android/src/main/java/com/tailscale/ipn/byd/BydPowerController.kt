@@ -23,8 +23,16 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
   fun start() {
     if (running) return
     running = true
-    executor.scheduleWithFixedDelay({ tick() }, 0, 500, TimeUnit.MILLISECONDS)
+    executor.execute { poll() }
     executor.scheduleWithFixedDelay({ connectHelper() }, 0, 10, TimeUnit.SECONDS)
+  }
+
+  @Synchronized
+  private fun poll() {
+    if (!running) return
+    tick()
+    val delay = if (helper != null) 5000L else state.nextPollDelayMillis()
+    if (running) executor.schedule({ poll() }, delay, TimeUnit.MILLISECONDS)
   }
 
   @Synchronized

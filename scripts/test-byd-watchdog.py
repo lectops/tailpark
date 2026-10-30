@@ -78,7 +78,8 @@ print("package:" + (pathlib.Path(os.environ["BYD_FIXTURE"]) / "test-apk").read_t
         (self.directory / "disabled").touch()
         for process in self.processes:
             try:
-                process.wait(timeout=4)
+                # Allow one five-second supervision interval plus child cleanup.
+                process.wait(timeout=8)
             except subprocess.TimeoutExpired:
                 pass
             try:
@@ -139,7 +140,7 @@ print("package:" + (pathlib.Path(os.environ["BYD_FIXTURE"]) / "test-apk").read_t
         self.eventually(lambda: len(self.events()) == 2)
         self.assertNotEqual(self.events()[0]["pid"], self.events()[1]["pid"])
         (self.directory / "disabled").touch()
-        self.assertEqual(0, first.wait(timeout=5))
+        self.assertEqual(0, first.wait(timeout=8))
         self.assertEqual(2, len(self.events()))
 
     def test_disable_during_backoff_prevents_respawn(self):
@@ -194,7 +195,7 @@ print("package:" + (pathlib.Path(os.environ["BYD_FIXTURE"]) / "test-apk").read_t
         self.eventually(lambda: len(self.events()) == 1)
         (self.directory / "test-apk").write_text("")
         self.advance(16)
-        self.assertEqual(0, process.wait(timeout=6))
+        self.assertEqual(0, process.wait(timeout=8))
         self.assertEqual(1, len(self.events()))
 
     def test_saved_disconnect_is_honored_before_helper_starts_work(self):

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.util.Base64
+import com.tailscale.ipn.App
 import com.tailscale.ipn.UninitializedApp
 import java.security.MessageDigest
 
@@ -72,19 +73,30 @@ class BydRecoveryReceiver : BroadcastReceiver() {
   }
 
   companion object {
-    internal fun resumeVpn(context: Context): String {
-      if (!BydPreferences.shouldResume(context)) {
-        BydHelperConnection.stopAsync(context)
+    internal fun resumeVpn(
+        context: Context,
+        app: UninitializedApp = UninitializedApp.get(),
+        vpnPrepared: Boolean = VpnService.prepare(context) == null,
+        initialize: () -> Unit = { App.get() },
+        stopHelper: () -> Unit = { BydHelperConnection.stopAsync(context) },
+    ): String {
+      if (!BydPreferences.wantsVpn(context)) {
+        stopHelper()
         return "DISABLED"
       }
-      val app = UninitializedApp.get()
-      if (app.isAbleToStartVPN() && VpnService.prepare(context) == null) {
+      if (!vpnPrepared) {
+        // Permission was revoked or belongs to another VPN. Require an explicit reconnect.
+        BydPreferences.setWanted(context, false)
+        return "UNAVAILABLE"
+      }
+      if (app.isAbleToStartVPN()) {
         app.startVPN()
         return "RECOVERING"
       }
-      // Permission or login was revoked. Do not keep a power helper running without a usable VPN.
-      BydPreferences.setWanted(context, false)
-      return "UNAVAILABLE"
+      // Cached readiness can be false while the backend loads its saved login. Initialize it and
+      // let App.updateConnStatus resume once readiness is observed; do not erase connection intent.
+      initialize()
+      return "WAITING_LOGIN"
     }
   }
 }

@@ -5,4 +5,13 @@
     <string name="byd_wifi_title" translatable="false">Keep Wi-Fi available while parked</string>
     <string name="byd_wifi_subtitle" translatable="false">Restore Wi-Fi after ACC off. Cellular remains supported when available.</string>
     <string name="byd_status_title" translatable="false">Parked connectivity</string>
+    <string name="byd_startup_title" translatable="false">Start and connect with the car</string>
+    <string name="byd_startup_subtitle" translatable="false">Open BYD startup settings and allow Tailpark. On DiLink 3.0, uncheck Tailpark in the startup restriction list. Check this setting after app updates. Connect once after signing in; future starts restore that connection unless you disconnect.</string>
+    <string name="byd_startup_unavailable" translatable="false">Open the car settings manually and allow Tailpark to start automatically.</string>
+    <string name="byd_startup_prompt_title" translatable="false">Let Tailpark start with your car</string>
+    <string name="byd_startup_prompt_first" translatable="false">In BYD startup settings, find Tailpark and turn OFF “Disable auto-start” (uncheck Tailpark in the restriction list). This lets Tailpark start and reconnect after the car restarts. Return here and confirm once you have checked the setting.</string>
+    <string name="byd_startup_prompt_recheck" translatable="false">Please confirm that “Disable auto-start” is still OFF for Tailpark in BYD startup settings. Your previous confirmation was saved, but Tailpark cannot automatically verify this setting.</string>
+    <string name="byd_startup_prompt_updated" translatable="false">Tailpark was updated. BYD may reset startup restrictions after an update. Open BYD startup settings and make sure “Disable auto-start” is OFF for Tailpark, then return and confirm.</string>
+    <string name="byd_startup_open_settings" translatable="false">Open BYD settings</string>
+    <string name="byd_startup_confirm_off" translatable="false">I checked — it’s off</string>
 </resources>

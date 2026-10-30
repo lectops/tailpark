@@ -2,7 +2,7 @@
 
 Tailpark keeps your BYD head unit on your tailnet after you switch the car off, so you can reach it remotely while it's parked.
 
-It is an unofficial fork of the [Tailscale Android client](https://github.com/tailscale/tailscale-android) 1.104.1 with a parked-connectivity controller added. Tailpark is not affiliated with or endorsed by Tailscale Inc. or BYD. "Tailscale" is a trademark of Tailscale Inc.
+It is an unofficial fork of the [Tailscale Android client](https://github.com/tailscale/tailscale-android) 1.104.4 with a parked-connectivity controller added. Tailpark is not affiliated with or endorsed by Tailscale Inc. or BYD. "Tailscale" is a trademark of Tailscale Inc.
 
 ## What it does
 
@@ -60,6 +60,8 @@ bash scripts/build-byd.sh
 ```
 
 The build fetches the pinned Tailscale Go toolchain, builds the networking library, checks formatting, runs unit tests, watchdog process tests and release lint, and writes a signed APK to `outputs/tailpark/`.
+
+Stable upstream updates are checked every six hours and built, tested, signed and published by GitHub Actions. See [automated releases](docs/RELEASING.md) for configuration and recovery steps.
 
 A signing key is generated in `.signing/` on first build. Keep that directory: Android only installs updates signed with the same key. Your own builds can't update the published release APK, and the reverse is also true.
 

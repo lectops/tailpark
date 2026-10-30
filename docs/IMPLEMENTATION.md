@@ -1,10 +1,10 @@
 # Tailpark implementation
 
-Tailpark combines the complete Tailscale 1.104.1 Android client with a controller for parked connectivity. A supervised helper keeps Android awake while the display stays dark and recovers the VPN when BYD kills ordinary app processes.
+Tailpark combines the complete Tailscale 1.104.4 Android client with a controller for parked connectivity. A supervised helper keeps Android awake while the display stays dark and recovers the VPN when BYD kills ordinary app processes.
 
 ## Upstream baseline
 
-The base is [tailscale/tailscale-android](https://github.com/tailscale/tailscale-android), tag `1.104.1-t7f4efe814-g6d75bd403`, commit `6d75bd403bb948ce97c1943e88019a91b1c49add`. The repository contains the Kotlin Android application and the Go `libtailscale/` binding layer. The networking dependency is [tailscale/tailscale](https://github.com/tailscale/tailscale).
+The base is [tailscale/tailscale-android](https://github.com/tailscale/tailscale-android), tag `1.104.4-t938213198-gb9d487fe6`, commit `b9d487fe6d7203aeac889aeec2faccb9d32bb701`. The repository contains the Kotlin Android application and the Go `libtailscale/` binding layer. The networking dependency is [tailscale/tailscale](https://github.com/tailscale/tailscale).
 
 Tailscale's existing `IPNService` provides foreground operation, sticky restart, and Android Always-on VPN support. Its network callback selects the underlying internet connection and reacts to cellular/Wi-Fi changes.
 

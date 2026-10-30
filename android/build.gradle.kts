@@ -27,7 +27,7 @@ android {
     targetSdk = androidApiLevel
 
     versionCode = computeVersionCode()
-    versionName = getVersionProperty("VERSION_LONG") + "-byd.5"
+    versionName = getVersionProperty("VERSION_LONG") + "-byd." + getTailparkProperty("BYD_VERSION")
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     buildConfigField(
@@ -174,4 +174,10 @@ fun computeVersionCode(): Int {
 
 fun isTV(): Boolean {
   return project.findProperty("PLATFORM")?.toString() == "tv"
+}
+
+fun getTailparkProperty(key: String): String {
+  val properties = Properties()
+  project.file("../tailpark.properties").inputStream().use(properties::load)
+  return properties.getProperty(key) ?: error("Missing Tailpark property: $key")
 }

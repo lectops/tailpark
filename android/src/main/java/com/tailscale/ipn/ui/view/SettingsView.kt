@@ -3,6 +3,8 @@
 
 package com.tailscale.ipn.ui.view
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -91,6 +93,27 @@ fun SettingsView(
       }
 
       Lists.SectionDivider()
+      Setting.Text(
+          R.string.byd_startup_title,
+          subtitle = stringResource(R.string.byd_startup_subtitle),
+          onClick = {
+            val app = App.get()
+            val intent =
+                Intent(Intent.ACTION_MAIN).apply {
+                  addCategory(Intent.CATEGORY_LAUNCHER)
+                  setPackage("com.byd.appstartmanagement")
+                  addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            try {
+              app.startActivity(intent)
+            } catch (_: android.content.ActivityNotFoundException) {
+              Toast.makeText(app, R.string.byd_startup_unavailable, Toast.LENGTH_LONG).show()
+            } catch (_: SecurityException) {
+              Toast.makeText(app, R.string.byd_startup_unavailable, Toast.LENGTH_LONG).show()
+            }
+          },
+      )
+      Lists.ItemDivider()
       Setting.Switch(
           R.string.byd_parked_title,
           subtitle = stringResource(R.string.byd_parked_subtitle),

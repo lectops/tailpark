@@ -115,7 +115,7 @@ while [ ! -f "$DIR/disabled" ]; do
                 break
             fi
         fi
-        sleep 1
+        sleep 5
     done
     stop_child
     if [ -f "$DIR/disabled" ]; then exit 0; fi

@@ -36,8 +36,10 @@ object BydPreferences {
     if (!value) BydHelperConnection.stopAsync(context)
   }
 
+  fun wantsVpn(context: Context): Boolean = prefs(context).getBoolean("wanted", false)
+
   fun shouldResume(context: Context): Boolean =
-      prefs(context).let { it.getBoolean("enabled", true) && it.getBoolean("wanted", false) }
+      prefs(context).getBoolean("enabled", true) && wantsVpn(context)
 
   @Synchronized
   fun token(context: Context): String {

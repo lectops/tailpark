@@ -33,6 +33,27 @@ class ParkedPowerStateTest {
   }
 
   @Test
+  fun slowPollingKeepsWakeToDarkFastAndRestoresDisplayOnNextAccCheck() {
+    val actions = Actions()
+    val state = ParkedPowerState(actions)
+    assertEquals(5000L, state.nextPollDelayMillis())
+    state.tick(true, true, 2, true, 0)
+    assertEquals(5000L, state.nextPollDelayMillis())
+    state.tick(true, true, 0, true, 5000)
+    assertEquals(500L, state.nextPollDelayMillis())
+    state.tick(true, true, 0, false, 5500)
+    assertEquals(500L, state.nextPollDelayMillis())
+    state.tick(true, true, 0, true, 6000)
+    assertEquals(listOf("wake", "dark"), actions.calls)
+    assertEquals(5000L, state.nextPollDelayMillis())
+    state.tick(true, true, 0, true, 11000)
+    assertTrue(actions.calls.contains("wifi"))
+    state.tick(true, true, 2, true, 16000)
+    assertEquals(1, actions.restores)
+    assertEquals(ParkedPowerState.Phase.DRIVING, state.phase())
+  }
+
+  @Test
   fun parkedSequenceWaitsThenWakesAndDarkens() {
     val actions = Actions()
     val state = ParkedPowerState(actions)

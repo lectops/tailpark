@@ -81,7 +81,7 @@ public final class BydPowerHelper {
                     Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
             BydPowerHelper helper = new BydPowerHelper(context, args[1]);
             helper.keepWifi = wifi.equals("1");
-            helper.ticker.scheduleWithFixedDelay(helper::tick, 0, 500, TimeUnit.MILLISECONDS);
+            helper.ticker.execute(helper::poll);
             helper.maintenance.scheduleWithFixedDelay(helper::maintain, 0, 10, TimeUnit.SECONDS);
             new Thread(helper::serve, "byd-helper-control").start();
             Runtime.getRuntime().addShutdownHook(new Thread(helper::shutdown));
@@ -90,6 +90,12 @@ public final class BydPowerHelper {
             Log.e("Tailpark", "Power helper could not start", e);
             Process.killProcess(Process.myPid());
         }
+    }
+
+    private synchronized void poll() {
+        if (!alive) return;
+        tick();
+        if (alive) ticker.schedule(this::poll, state.nextPollDelayMillis(), TimeUnit.MILLISECONDS);
     }
 
     private synchronized void tick() {

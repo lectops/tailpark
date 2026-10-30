@@ -8,11 +8,14 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
+from release_config import configuration, release_name
+
+release = configuration()
 
 root = Path(__file__).resolve().parents[1]
 output = root / "outputs/tailpark"
-apk = output / "Tailpark-1.104.1-byd.5.apk"
-sdk = Path(os.environ.get("ANDROID_SDK_ROOT", Path.home() / "Library/Android/sdk"))
+apk = output / ("Tailpark-" + release_name() + ".apk")
+sdk = Path(os.environ.get("ANDROID_HOME", os.environ.get("ANDROID_SDK_ROOT", Path.home() / "Library/Android/sdk")))
 tools = sdk / "build-tools/36.0.0"
 verification = subprocess.run([str(tools / "apksigner"), "verify", "--verbose", "--print-certs", str(apk)],
                               check=True, capture_output=True, text=True).stdout
@@ -22,7 +25,8 @@ assert "package: name='dev.tailpark.byd'" in badging
 assert "application-label:'Tailpark'" in badging
 assert "sdkVersion:'26'" in badging
 assert "arm64-v8a" in badging
-assert "-byd.5" in badging
+assert "versionName=\'" + release["UPSTREAM_VERSION"] + "-" in badging
+assert "-byd." + release["BYD_VERSION"] + "\'" in badging
 aar = root / "android/libs/libtailscale.aar"
 go_inputs = list((root / "libtailscale").rglob("*.go")) + [root / "go.mod", root / "go.sum"]
 assert aar.stat().st_mtime >= max(path.stat().st_mtime for path in go_inputs), "Go AAR is older than its source"
@@ -42,8 +46,8 @@ assert watchdog_tests["tests"] > 0 and watchdog_tests["failures"] == 0 and watch
 (output / "signature-verification.txt").write_text(verification)
 (output / "package-metadata.txt").write_text(badging)
 (output / "build-manifest.json").write_text(json.dumps({
-    "package": "dev.tailpark.byd", "label": "Tailpark", "upstream": "1.104.1",
-    "byd_version": 5, "apk": apk.name, "sha256": sha, "bytes": apk.stat().st_size,
+    "package": "dev.tailpark.byd", "label": "Tailpark", "upstream": release["UPSTREAM_VERSION"],
+    "byd_version": int(release["BYD_VERSION"]), "apk": apk.name, "sha256": sha, "bytes": apk.stat().st_size,
     "implementation": "BYD parked connectivity with supervised helper and recurring network recovery",
     "unit_tests": tests,
     "watchdog_tests": watchdog_tests,

@@ -15,6 +15,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Uri
+import android.net.VpnService
 import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -339,7 +340,16 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
    * value without needing a fully initialized instance of the application.
    */
   private fun updateConnStatus(ableToStartVPN: Boolean) {
+    val wasReady = isAbleToStartVPN()
     setAbleToStartVPN(ableToStartVPN)
+    if (
+        !wasReady &&
+            ableToStartVPN &&
+            BydPreferences.wantsVpn(this) &&
+            VpnService.prepare(this) == null
+    ) {
+      startVPN()
+    }
     QuickToggleService.updateTile()
     TSLog.d("App", "Set Tile Ready: $ableToStartVPN")
   }
