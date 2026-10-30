@@ -22,6 +22,10 @@ release with the APK, SHA-256, build manifest, package metadata and certificate
 verification report. An existing release is skipped. A failed run is visible
 in GitHub Actions and can be retried after fixing its cause.
 
+Watchdog tests, native compilation, Android build and APK verification have
+separate visible steps and timeouts. Go and Gradle dependency/build caches are
+reused between successful builds; the first uncached build takes longer.
+
 The repository secrets `TAILPARK_KEYSTORE_B64` and `TAILPARK_KEYSTORE_PASSWORD`
 contain the existing Tailpark signer. Keep the original `.signing/` directory
 backed up. CI fails if signing material is missing; it never creates a new key.

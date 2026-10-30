@@ -14,11 +14,24 @@ if [[ "${CI:-}" == "true" ]]; then
 fi
 python3 scripts/prepare-byd-signing.py
 mkdir -p outputs/tailpark
-python3 scripts/test-byd-watchdog.py --report outputs/tailpark/watchdog-tests.json
 export NDK_ROOT="$ANDROID_HOME/ndk/23.1.7779620"
-make libtailscale
-(cd android && ./gradlew ktfmtCheck test lintVitalRelease assembleRelease)
-mkdir -p outputs/tailpark
-APK_NAME=$(python3 scripts/release_config.py)
-cp android/build/outputs/apk/release/android-release.apk "outputs/tailpark/$APK_NAME"
-python3 scripts/package-byd.py
+
+watchdog() {
+    python3 scripts/test-byd-watchdog.py --report outputs/tailpark/watchdog-tests.json
+}
+native() {
+    make libtailscale
+}
+android() {
+    (cd android && ./gradlew --console=plain ktfmtCheck test lintVitalRelease assembleRelease)
+}
+package() {
+    APK_NAME=$(python3 scripts/release_config.py)
+    cp android/build/outputs/apk/release/android-release.apk "outputs/tailpark/$APK_NAME"
+    python3 scripts/package-byd.py
+}
+case "${1:-all}" in
+    all) watchdog; native; android; package ;;
+    watchdog|native|android|package) "$1" ;;
+    *) echo "Expected all, watchdog, native, android or package" >&2; exit 2 ;;
+esac

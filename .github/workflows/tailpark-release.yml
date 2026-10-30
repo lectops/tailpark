@@ -60,9 +60,36 @@ jobs:
           mkdir -p .signing
           printf '%s' "$KEYSTORE_B64" | base64 --decode > .signing/byd.jks
           printf '%s\n' "$KEYSTORE_PASSWORD" > .signing/password
-      - name: Build, test, lint and verify signed APK
+      - name: Restore Go and Gradle build caches
         if: steps.prepare.outputs.needed == 'true'
-        run: bash scripts/build-byd.sh
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/.cache/tailscale-go
+            ~/.cache/tailscale-go.extracted
+            ~/go/pkg/mod
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: tailpark-build-${{ runner.os }}-${{ hashFiles('go.toolchain.rev', 'go.sum', 'android/gradle/libs.versions.toml', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            tailpark-build-${{ runner.os }}-
+      - name: Test watchdog recovery
+        if: steps.prepare.outputs.needed == 'true'
+        timeout-minutes: 5
+        run: bash scripts/build-byd.sh watchdog
+      - name: Compile native Go networking library
+        if: steps.prepare.outputs.needed == 'true'
+        timeout-minutes: 25
+        run: bash scripts/build-byd.sh native
+      - name: Test, lint and assemble Android release
+        if: steps.prepare.outputs.needed == 'true'
+        timeout-minutes: 25
+        run: bash scripts/build-byd.sh android
+      - name: Verify and package signed APK
+        if: steps.prepare.outputs.needed == 'true'
+        timeout-minutes: 3
+        run: bash scripts/build-byd.sh package
       - name: Publish tested commit and release
         if: steps.prepare.outputs.needed == 'true'
         env:
