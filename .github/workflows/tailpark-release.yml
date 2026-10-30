@@ -19,7 +19,6 @@ jobs:
     timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}
-      NDK_ROOT: /usr/local/lib/android/sdk/ndk/23.1.7779620
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -39,6 +38,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Set up Android SDK command-line tools
+        if: steps.prepare.outputs.needed == 'true'
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
       - name: Install pinned Android tools
         if: steps.prepare.outputs.needed == 'true'
         run: |
