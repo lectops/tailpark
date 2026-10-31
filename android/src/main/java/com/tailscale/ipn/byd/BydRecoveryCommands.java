@@ -6,6 +6,7 @@ import java.io.IOException;
 
 /** Fixed shell entrypoints; BYD's cold-start policy can discard manifest broadcasts. */
 final class BydRecoveryCommands {
+    enum Outcome { REQUESTED, DISABLED, IDLE_EXPIRED, UNAVAILABLE, REJECTED }
     interface Runner {
         BydShell.Result run(int timeoutSeconds, String... command) throws IOException, InterruptedException;
     }
@@ -15,21 +16,36 @@ final class BydRecoveryCommands {
     }
 
     static void recover(String packageName, String token, Runner runner) throws IOException, InterruptedException {
+        recoverObserved(packageName, token, runner);
+    }
+
+    static Outcome recoverObserved(String packageName, String token) throws IOException, InterruptedException {
+        return recoverObserved(packageName, token, BydShell::run);
+    }
+
+    static Outcome recoverObserved(String packageName, String token, Runner runner) throws IOException, InterruptedException {
         try {
             BydShell.Result result = runner.run(10, "/system/bin/am", "broadcast",
                     "--receiver-foreground", "--include-stopped-packages", "-n",
                     packageName + "/com.tailscale.ipn.byd.BydRecoveryReceiver", "-a",
                     packageName + ".BYD_RECOVER", "--es", "token", token);
-            if (receiverAnswered(result)) return;
+            if (receiverAnswered(result)) {
+                if (result.output.contains("data=\"IDLE_EXPIRED\"")) return Outcome.IDLE_EXPIRED;
+                if (result.output.contains("data=\"DISABLED\"")) return Outcome.DISABLED;
+                if (result.output.contains("data=\"UNAVAILABLE\"")) return Outcome.UNAVAILABLE;
+                if (result.output.contains("data=\"REJECTED\"")) return Outcome.REJECTED;
+                return Outcome.REQUESTED;
+            }
         } catch (IOException ignored) {
             // A timed-out or discarded broadcast does not establish that the receiver ran.
         }
         startActivity(packageName, token, runner);
+        return Outcome.REQUESTED;
     }
 
     static boolean receiverAnswered(BydShell.Result result) {
         if (result.exitCode != 0) return false;
-        for (String reply : new String[]{"RECOVERING", "DISABLED", "UNAVAILABLE", "REJECTED"}) {
+        for (String reply : new String[]{"RECOVERING", "DISABLED", "IDLE_EXPIRED", "UNAVAILABLE", "REJECTED"}) {
             if (result.output.contains("data=\"" + reply + "\"")) return true;
         }
         return false;

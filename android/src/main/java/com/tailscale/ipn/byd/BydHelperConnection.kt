@@ -31,7 +31,8 @@ object BydHelperConnection {
     stopExecutor.execute {
       // A reconnect may have superseded the queued stop.
       if (BydPreferences.shouldResume(appContext)) return@execute
-      if (runCatching { request(appContext, "STOP") }.isSuccess) return@execute
+      val command = if (BydPreferences.idleExpired(appContext)) "IDLE_STOP" else "STOP"
+      if (runCatching { request(appContext, command) }.isSuccess) return@execute
       runCatching {
         val key = BydAdb.key(appContext, create = false) ?: return@runCatching
         val directory = BydRuntimeFiles(appContext.packageName).directory.path

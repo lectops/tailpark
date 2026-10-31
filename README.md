@@ -12,6 +12,7 @@ It is an unofficial fork of the [Tailscale Android client](https://github.com/ta
 - Stops parked operation when you disconnect, sign out, revoke VPN permission, or turn the setting off.
 - Optionally lets the car sleep after remote activity stops, while active transfers renew the timeout. A Keep awake override covers quiet sessions.
 - Resumes after a reboot or app update if you had connected before.
+- Keeps a bounded local [connection timeline](docs/DIAGNOSTICS.md) to inspect, export or clear after an outage.
 
 The package ID is `dev.tailpark.byd`, so it installs alongside the official Tailscale app. Android allows only one active VPN at a time.
 
@@ -63,6 +64,8 @@ bash scripts/build-byd.sh
 The build fetches the pinned Tailscale Go toolchain, builds the networking library, checks formatting, runs unit tests, watchdog process tests and release lint, and writes a signed APK to `outputs/tailpark/`.
 
 Stable upstream updates are checked every six hours and built, tested, signed and published by GitHub Actions. See [automated releases](docs/RELEASING.md) for configuration and recovery steps.
+
+The app also checks stable releases in **Settings → Updates**, with an optional **Automatically update while parked** setting that is off by default. See [in-app updates](docs/UPDATES.md) for validation, parked-state requirements and Android install confirmation fallback.
 
 A signing key is generated in `.signing/` on first build. Keep that directory: Android only installs updates signed with the same key. Your own builds can't update the published release APK, and the reverse is also true.
 

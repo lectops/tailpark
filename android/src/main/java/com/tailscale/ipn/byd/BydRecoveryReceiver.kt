@@ -36,11 +36,23 @@ class BydRecoveryReceiver : BroadcastReceiver() {
                           App.get().getLibtailscaleApp().parkedActivityIdleMillis()
                         },
                     )
-            )
-                "IDLE_CONFIRMED"
-            else "IDLE_DEFERRED"
+            ) {
+              BydDiagnostics.observe(
+                  context,
+                  BydFlightRecorder.Code.PARKED_ACCESS,
+                  BydFlightRecorder.Value.IDLE_EXPIRED,
+              )
+              "IDLE_CONFIRMED"
+            } else "IDLE_DEFERRED"
           } else "REJECTED"
       resultCode = -1
+      return
+    }
+    if (intent.action == Intent.ACTION_SHUTDOWN) {
+      val pending = goAsync()
+      BydDiagnostics.broadcast(context, BydFlightRecorder.Code.SHUTDOWN_OBSERVED) {
+        pending.finish()
+      }
       return
     }
     if (intent.action == "${context.packageName}.BYD_HELPER_CHECK") {
@@ -99,6 +111,16 @@ class BydRecoveryReceiver : BroadcastReceiver() {
     }
     resultData = resumeVpn(context)
     resultCode = -1
+    val event =
+        when (intent.action) {
+          Intent.ACTION_BOOT_COMPLETED -> BydFlightRecorder.Code.BOOT_OBSERVED
+          Intent.ACTION_MY_PACKAGE_REPLACED -> BydFlightRecorder.Code.PACKAGE_REPLACED
+          else -> null
+        }
+    if (event != null) {
+      val pending = goAsync()
+      BydDiagnostics.broadcast(context, event) { pending.finish() }
+    }
   }
 
   companion object {

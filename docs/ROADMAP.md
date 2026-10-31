@@ -17,8 +17,8 @@ Publish each release with its APK SHA-256, signing certificate fingerprint and r
 
 ## Later
 
-- **In-app updates:** check for a new release, show notes, download and install with confirmation. Verify checksum, package, signing certificate, Android version and ABI before installing. A failed update must leave the existing install running. Automatic install would be opt-in and only after manual updates are proven.
+- **In-app updates:** implemented with signed-APK validation, manual confirmation and opt-in parked shell installation; same-key updates and firmware behavior still need vehicle validation. See [UPDATES.md](UPDATES.md).
 - **Recovery from a bad update:** the helper loads its code from the main APK, so a broken update could take out both. Evaluate a small independent recovery component before relying on unattended updates.
-- **Health screen:** show version, connection intent, ACC and display state, network, last healthy tunnel time, and recent recovery events, with a redacted diagnostic export.
-- **Parking limits:** an optional parking time limit, and a battery cutoff once 12 V readings have been validated on real cars.
+- **Health screen:** local connection and power observations, recovery events and redacted timeline export are implemented. A fuller live status screen and last healthy tunnel time remain future work.
+- **Parking limits:** inactivity-based parked access and Keep awake are implemented; active transfers renew the optional timer. Vehicle sleep/transfer validation remains open, and a battery cutoff needs validated 12 V readings.
 - **Wider support:** check platform capabilities before enabling parked control on untested firmware, and test other BYD models.

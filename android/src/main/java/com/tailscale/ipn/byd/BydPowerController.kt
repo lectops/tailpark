@@ -91,6 +91,11 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
                 )
         ) {
           localIdle.expire()
+          BydDiagnostics.observe(
+              context,
+              BydFlightRecorder.Code.PARKED_ACCESS,
+              BydFlightRecorder.Value.IDLE_EXPIRED,
+          )
           platform.release()
           BydHelperConnection.stopAsync(context)
           BydPreferences.idleStatus.value = "Sleep eligible · remote wake is not guaranteed"
@@ -141,9 +146,21 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
               context,
               "IDLE ${prefs.getInt("idle_timeout_minutes", 0) * 60000L} ${if (prefs.getBoolean("idle_keep_awake", false)) 1 else 0} ${prefs.getLong("idle_generation", 0)} ${activityIdleMillis()} $health",
           )
+      BydDiagnostics.observe(
+          context,
+          BydFlightRecorder.Code.HELPER,
+          BydFlightRecorder.Value.AVAILABLE,
+      )
+      BydDiagnostics.syncHelper(context)
+      helper?.let { com.tailscale.ipn.byd.update.UpdateManager.observeHelperStatus(context, it) }
       setupMessage = null
       if (status.optBoolean("watchdogAlive")) return
     } catch (_: Exception) {
+      BydDiagnostics.observe(
+          context,
+          BydFlightRecorder.Code.HELPER,
+          BydFlightRecorder.Value.UNAVAILABLE,
+      )
       helper = null
     }
     try {

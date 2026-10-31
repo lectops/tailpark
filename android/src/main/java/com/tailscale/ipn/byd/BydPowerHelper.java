@@ -20,6 +20,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
+import com.tailscale.ipn.byd.BydFlightRecorder.Code;
+import com.tailscale.ipn.byd.BydFlightRecorder.Value;
 
 /** Detached app_process entrypoint. ADB launches it with shell's actual power permission. */
 public final class BydPowerHelper {
@@ -32,6 +34,7 @@ public final class BydPowerHelper {
     private final ParkedIdlePolicy idle = new ParkedIdlePolicy();
     private long lastIdleCheckpoint;
     private volatile boolean expiryChecking;
+    private final BydHelperDiagnostics diagnostics;
     private final BydRecoveryPolicy recovery = new BydRecoveryPolicy(SystemClock.elapsedRealtime());
     public static final int PORT = 41642;
     private final ServerSocket server;
@@ -57,6 +60,7 @@ public final class BydPowerHelper {
         server = new ServerSocket();
         server.setReuseAddress(true);
         server.bind(new InetSocketAddress("127.0.0.1", PORT));
+        diagnostics = new BydHelperDiagnostics(context, runtime);
         try { runtime.preserveStatusBeforeRestart(); }
         catch (IOException e) { Log.w("Tailpark", "Previous helper status could not be retained"); }
         runtime.write("helper.pid", Integer.toString(Process.myPid()));
@@ -64,6 +68,7 @@ public final class BydPowerHelper {
         runtime.write("helper.identity", BydRuntimeFiles.fingerprint(token));
         // Framework/AppOps attribution must match the actual shell UID, not the VPN's app UID.
         Context shellContext = context.createPackageContext("com.android.shell", Context.CONTEXT_IGNORE_SECURITY);
+        diagnostics.startNetworks(shellContext);
         platform = new BydPlatform(shellContext);
         state = new ParkedPowerState(platform);
         restoreIdle();
@@ -115,6 +120,7 @@ public final class BydPowerHelper {
             long now = SystemClock.elapsedRealtime();
             lastTickAt = now;
             tickError = null;
+            diagnostics.power(observedPower, observedScreenOn, state.phase().name(), state.error() != null);
             if (now - lastFileHeartbeat >= 5000) {
                 runtime.heartbeat();
                 // Remains available after connectivity is lost or Android restarts.
@@ -124,10 +130,14 @@ public final class BydPowerHelper {
             long sleep = now - SystemClock.uptimeMillis();
             long suspended = Math.max(0, sleep - previousSleep);
             // Separate clock reads have small jitter; report only meaningful suspend episodes.
-            if (suspended >= 30000) suspendMs += suspended;
+            if (suspended >= 30000) {
+                suspendMs += suspended;
+                diagnostics.record(Code.SUSPEND, Value.STARTED);
+            }
             previousSleep = sleep;
         } catch (Exception e) {
             tickError = e.getClass().getSimpleName();
+            diagnostics.observe(Code.POWER_ERROR, Value.FAILED);
             try { runtime.write("last-status.json", status().toString() + "\n"); }
             catch (Exception ignored) { }
             Log.w("Tailpark", "Power helper tick failed", e);
@@ -140,6 +150,7 @@ public final class BydPowerHelper {
             // Updates must be checked even when the updated app keeps sending heartbeats.
             if (!apkPath.equals(context.getPackageManager()
                     .getApplicationInfo(context.getPackageName(), 0).sourceDir)) {
+                diagnostics.record(Code.SESSION_STOPPED, Value.APK_CHANGED);
                 shutdown();
                 return;
             }
@@ -148,12 +159,14 @@ public final class BydPowerHelper {
                 lastPreferenceCheck = now;
                 String wifi = BydRuntimeFiles.desiredConfig(context.getPackageName(), token);
                 if (wifi == null) {
+                    diagnostics.record(Code.SESSION_STOPPED, Value.DISABLED);
                     runtime.disable();
                     shutdown();
                     return;
                 }
                 keepWifi = wifi.equals("1");
             }
+            diagnostics.watchdog(runtime.watchdogIdentity());
             if (alive && idle.shouldConfirm(observedPower, now) && !expiryChecking) {
                 expiryChecking = true;
                 try {
@@ -164,6 +177,8 @@ public final class BydPowerHelper {
                         checkpointIdle(SystemClock.elapsedRealtime());
                         runtime.write("idle-expired", "inactivity\n");
                         runtime.write("last-status.json", status().toString() + "\n");
+                        diagnostics.record(Code.PARKED_ACCESS, Value.IDLE_EXPIRED);
+                        diagnostics.record(Code.SESSION_STOPPED, Value.IDLE_EXPIRED);
                         shutdown();
                         return;
                     }
@@ -172,6 +187,7 @@ public final class BydPowerHelper {
             }
             if (alive && recovery.shouldRecover(now)) recoverVpn();
         } catch (PackageManager.NameNotFoundException e) {
+            diagnostics.record(Code.SESSION_STOPPED, Value.UNINSTALLED);
             shutdown();
         } catch (Exception e) {
             Log.w("Tailpark", "Helper maintenance failed: " + e.getClass().getSimpleName());
@@ -179,9 +195,22 @@ public final class BydPowerHelper {
     }
 
     private void recoverVpn() {
+        diagnostics.record(Code.RECOVERY, Value.ATTEMPT);
         try {
-            BydRecoveryCommands.recover(context.getPackageName(), token);
+            BydRecoveryCommands.Outcome outcome = BydRecoveryCommands.recoverObserved(context.getPackageName(), token);
+            diagnostics.record(Code.RECOVERY, outcome == BydRecoveryCommands.Outcome.DISABLED ? Value.DISABLED
+                    : outcome == BydRecoveryCommands.Outcome.IDLE_EXPIRED ? Value.IDLE_EXPIRED
+                    : outcome == BydRecoveryCommands.Outcome.UNAVAILABLE ? Value.UNAVAILABLE
+                    : outcome == BydRecoveryCommands.Outcome.REJECTED ? Value.REJECTED : Value.REQUESTED);
+            if (outcome == BydRecoveryCommands.Outcome.IDLE_EXPIRED) {
+                idle.expire();
+                runtime.write("idle-expired", "inactivity\n");
+                diagnostics.record(Code.PARKED_ACCESS, Value.IDLE_EXPIRED);
+                diagnostics.record(Code.SESSION_STOPPED, Value.IDLE_EXPIRED);
+                shutdown();
+            }
         } catch (Exception e) {
+            diagnostics.record(Code.RECOVERY, Value.FAILED);
             Log.w("Tailpark", "VPN recovery failed: " + e.getClass().getSimpleName());
         }
     }
@@ -195,11 +224,20 @@ public final class BydPowerHelper {
                 if (separator < 0 || !MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),
                         line.substring(0, separator).getBytes(StandardCharsets.UTF_8))) continue;
                 String command = line.substring(separator + 1);
-                boolean stop = command.equals("STOP");
+                if (command.matches("DIAGNOSTICS [0-9]{1,18}") || command.equals("CLEAR_DIAGNOSTICS")) {
+                    JSONObject response = command.equals("CLEAR_DIAGNOSTICS") ? diagnostics.clear()
+                            : diagnostics.page(Long.parseLong(command.substring(12)));
+                    client.getOutputStream().write((response.toString() + "\n").getBytes(StandardCharsets.UTF_8));
+                    client.getOutputStream().flush();
+                    continue;
+                }
+                boolean idleStop = command.equals("IDLE_STOP");
+                boolean stop = command.equals("STOP") || idleStop;
                 boolean restart = command.equals("RESTART");
                 if (command.matches("CONFIG [01] [01]")) {
                     keepWifi = command.charAt(7) == '1';
                     recovery.heartbeat(SystemClock.elapsedRealtime(), command.charAt(9) == '1');
+                    diagnostics.observe(Code.VPN, command.charAt(9) == '1' ? Value.RUNNING : Value.DOWN);
                 } else if (command.matches("IDLE [0-9]{1,8} [01] [0-9]{1,18} -?[0-9]{1,18} [01]")) {
                     String[] fields = command.split(" ");
                     long now = SystemClock.elapsedRealtime();
@@ -207,7 +245,13 @@ public final class BydPowerHelper {
                     idle.report(Long.parseLong(fields[4]), fields[5].equals("1"), now);
                 } else if (command.equals("PING")) recovery.heartbeat(SystemClock.elapsedRealtime(), false);
                 else if (!stop && !restart && !command.equals("STATUS")) continue;
-                if (stop) runtime.disable();
+                if (idleStop) {
+                    idle.expire();
+                    runtime.write("idle-expired", "inactivity\n");
+                    diagnostics.record(Code.PARKED_ACCESS, Value.IDLE_EXPIRED);
+                } else if (stop) runtime.disable();
+                if (stop || restart) diagnostics.record(Code.SESSION_STOPPED,
+                        idleStop ? Value.IDLE_EXPIRED : stop ? Value.DISABLED : Value.RESTART);
                 client.getOutputStream().write((status().toString() + "\n").getBytes(StandardCharsets.UTF_8));
                 client.getOutputStream().flush();
                 if (stop || restart) shutdown();
@@ -261,6 +305,8 @@ public final class BydPowerHelper {
     private synchronized void shutdown() {
         if (!alive) return;
         alive = false;
+        diagnostics.closeNetworks();
+        diagnostics.observe(Code.SESSION_STOPPED, Value.STOPPED);
         ticker.shutdownNow();
         maintenance.shutdownNow();
         platform.release();

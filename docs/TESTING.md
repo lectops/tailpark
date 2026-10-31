@@ -31,6 +31,7 @@ These were run on 1.104.1-byd.4, the last build before the rename. byd.5 changes
 | App update signed with the same key | Settings and login retained, helper adopts the new APK |
 | Parked power use | Measured 12 V drain over time |
 | Other BYD models and DiLink versions | Any report helps |
+| Connection timeline on DiLink | Network loss with app killed, helper/watchdog restart observations, boot retention, explicit export and offline clear; verify that gaps stay unknown and exports contain no secrets or network identifiers |
 
 ## Monitoring script
 

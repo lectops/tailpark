@@ -36,6 +36,7 @@ import com.tailscale.ipn.App
 import com.tailscale.ipn.BuildConfig
 import com.tailscale.ipn.R
 import com.tailscale.ipn.byd.BydPreferences
+import com.tailscale.ipn.byd.update.UpdateSettings
 import com.tailscale.ipn.mdm.AlwaysNeverUserDecides
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.ShowHide
@@ -131,6 +132,9 @@ fun SettingsView(
       Lists.ItemDivider()
       Setting.Text(R.string.byd_status_title, subtitle = parkedStatus)
       BydIdleSettings(enabled = parkedEnabled)
+      Lists.ItemDivider()
+      BydDiagnosticsSettings()
+      UpdateSettings()
 
       Lists.SectionDivider()
       Setting.Text(

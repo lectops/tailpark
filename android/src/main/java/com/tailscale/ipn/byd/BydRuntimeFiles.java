@@ -58,15 +58,17 @@ final class BydRuntimeFiles {
         catch (IOException e) { return ""; }
     }
 
-    boolean watchdogAlive() {
+    boolean watchdogAlive() { return watchdogIdentity() != null; }
+
+    String watchdogIdentity() {
         try {
             String pid = new String(Files.readAllBytes(file("watchdog.lock/pid").toPath()),
                     StandardCharsets.UTF_8).trim();
-            if (!pid.matches("[0-9]+")) return false;
+            if (!pid.matches("[0-9]+")) return null;
             String command = new String(Files.readAllBytes(new File("/proc/" + pid + "/cmdline").toPath()),
                     StandardCharsets.UTF_8);
-            return command.contains(file("watchdog.sh").getPath());
-        } catch (IOException e) { return false; }
+            return command.contains(file("watchdog.sh").getPath()) ? pid : null;
+        } catch (IOException e) { return null; }
     }
 
     static String fingerprint(String value) {
