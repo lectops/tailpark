@@ -216,6 +216,7 @@ fun MainView(
               }
             },
         )
+        BydDiagnosticsSettings(startupSummary = true)
         when (state) {
           Ipn.State.Running -> {
             viewModel.maybeRequestVpnPermission()

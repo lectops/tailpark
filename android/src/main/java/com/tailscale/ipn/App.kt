@@ -26,6 +26,8 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.tailscale.ipn.byd.BydDiagnostics
+import com.tailscale.ipn.byd.BydFlightRecorder
 import com.tailscale.ipn.byd.BydPreferences
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.MDMSettingsChangedReceiver
@@ -116,6 +118,7 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
   override fun onCreate() {
     super.onCreate()
     BydPreferences.initialize(this)
+    BydDiagnostics.initialize(this)
     appInstance = this
     setUnprotectedInstance(this)
     mdmChangeReceiver = MDMSettingsChangedReceiver()
@@ -148,6 +151,11 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
   }
 
   override fun onTerminate() {
+    BydDiagnostics.observe(
+        this,
+        BydFlightRecorder.Code.SESSION_STOPPED,
+        BydFlightRecorder.Value.STOPPED,
+    )
     super.onTerminate()
     Notifier.stop()
     notificationManager.cancelAll()
@@ -207,6 +215,19 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
             }
             .distinctUntilChanged()
             .collect { (state, hideDisconnectAction, exitNodeName) ->
+              BydDiagnostics.observe(
+                  this@App,
+                  BydFlightRecorder.Code.BACKEND,
+                  when (state) {
+                    Ipn.State.Running -> BydFlightRecorder.Value.RUNNING
+                    Ipn.State.Starting -> BydFlightRecorder.Value.STARTING
+                    Ipn.State.Stopping -> BydFlightRecorder.Value.STOPPING
+                    Ipn.State.Stopped -> BydFlightRecorder.Value.STOPPED
+                    Ipn.State.NeedsLogin -> BydFlightRecorder.Value.NEEDS_LOGIN
+                    Ipn.State.NeedsMachineAuth -> BydFlightRecorder.Value.NEEDS_MACHINE_AUTH
+                    else -> BydFlightRecorder.Value.UNKNOWN
+                  },
+              )
               val ableToStartVPN = state > Ipn.State.NeedsMachineAuth
               // If VPN is stopped, show a disconnected notification. If it is running as a
               // foreground
