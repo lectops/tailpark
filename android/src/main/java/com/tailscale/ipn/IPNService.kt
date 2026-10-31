@@ -9,6 +9,8 @@ import android.net.Network
 import android.net.VpnService
 import android.os.Build
 import android.system.OsConstants
+import com.tailscale.ipn.byd.BydDiagnostics
+import com.tailscale.ipn.byd.BydFlightRecorder
 import com.tailscale.ipn.byd.BydPowerController
 import com.tailscale.ipn.byd.BydPreferences
 import com.tailscale.ipn.mdm.MDMSettings
@@ -46,6 +48,11 @@ open class IPNService : VpnService(), libtailscale.IPNService {
 
   override fun updateVpnStatus(status: Boolean) {
     bydVpnActive = status
+    BydDiagnostics.observe(
+        this,
+        BydFlightRecorder.Code.VPN,
+        if (status) BydFlightRecorder.Value.RUNNING else BydFlightRecorder.Value.DOWN,
+    )
     app.getAppScopedViewModel().setVpnActive(status)
   }
 
@@ -53,6 +60,8 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     super.onCreate()
     // grab app to make sure it initializes
     app = App.get()
+    BydDiagnostics.observe(this, BydFlightRecorder.Code.SERVICE, BydFlightRecorder.Value.STARTED)
+    BydDiagnostics.network(this, NetworkChangeCallback.cachedDefaultNetwork)
 
     NetworkChangeCallback.setUnderlyingNetworkListener { network ->
       updateUnderlyingNetwork(network)
@@ -136,6 +145,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   override fun onDestroy() {
+    BydDiagnostics.observe(this, BydFlightRecorder.Code.SERVICE, BydFlightRecorder.Value.STOPPED)
     parkedController?.close()
     parkedController = null
     NetworkChangeCallback.setUnderlyingNetworkListener(null)
@@ -145,6 +155,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   override fun onRevoke() {
+    BydDiagnostics.observe(this, BydFlightRecorder.Code.SERVICE, BydFlightRecorder.Value.REVOKED)
     // VPN permission was granted to another app, so tell the Go backend and then set prepared to be
     // false so that when user attempts to connect again, VpnService.prepare() is called
     app.setWantRunning(false)
@@ -159,6 +170,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
   }
 
   private fun updateUnderlyingNetwork(network: Network?) {
+    BydDiagnostics.network(this, network)
     val networks = network?.let { arrayOf(it) } ?: emptyArray()
     if (!setUnderlyingNetworks(networks)) {
       TSLog.w(TAG, "Failed to set underlying network: $network")

@@ -92,9 +92,20 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
         throw IllegalStateException("Reloading parked helper")
       }
       helper = BydHelperConnection.request(context, config)
+      BydDiagnostics.observe(
+          context,
+          BydFlightRecorder.Code.HELPER,
+          BydFlightRecorder.Value.AVAILABLE,
+      )
+      BydDiagnostics.syncHelper(context)
       setupMessage = null
       if (status.optBoolean("watchdogAlive")) return
     } catch (_: Exception) {
+      BydDiagnostics.observe(
+          context,
+          BydFlightRecorder.Code.HELPER,
+          BydFlightRecorder.Value.UNAVAILABLE,
+      )
       helper = null
     }
     try {
