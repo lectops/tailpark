@@ -52,10 +52,7 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
             if (BydPreferences.idleExpired(context))
                 "Parked access ended after inactivity · reconnect when the car starts"
             else "Parked connectivity is off"
-        BydPreferences.idleStatus.value =
-            if (BydPreferences.idleExpired(context))
-                "Sleep eligible · remote wake is not guaranteed"
-            else "No inactivity timeout"
+        BydPreferences.refreshIdleStatus(context)
         runCatching { App.get().getLibtailscaleApp().setParkedActivityTracking(false) }
         return
       }

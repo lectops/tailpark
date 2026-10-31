@@ -3,6 +3,8 @@
 package com.tailscale.ipn.ui.view
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -12,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import com.tailscale.ipn.App
 import com.tailscale.ipn.byd.BydPreferences
 import com.tailscale.ipn.ui.util.Lists
@@ -51,7 +54,7 @@ fun BydIdleSettings(enabled: Boolean) {
         onDismissRequest = { choose = false },
         title = { Text("Inactivity timeout") },
         text = {
-          Column {
+          Column(Modifier.verticalScroll(rememberScrollState())) {
             Text(
                 "Application traffic renews the timer. Quiet sessions, small probes and very slow transfers may not count. This releases Tailpark's locks so the car can sleep; it is not a battery cutoff."
             )
