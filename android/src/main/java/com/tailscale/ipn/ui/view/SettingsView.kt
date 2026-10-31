@@ -130,6 +130,7 @@ fun SettingsView(
       )
       Lists.ItemDivider()
       Setting.Text(R.string.byd_status_title, subtitle = parkedStatus)
+      BydIdleSettings(enabled = parkedEnabled)
 
       Lists.SectionDivider()
       Setting.Text(

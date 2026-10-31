@@ -10,6 +10,7 @@ It is an unofficial fork of the [Tailscale Android client](https://github.com/ta
 - Rechecks and restores Wi-Fi while parked. Built-in cellular data also works.
 - Runs a supervised helper that brings the VPN back when BYD's power policy kills the app.
 - Stops parked operation when you disconnect, sign out, revoke VPN permission, or turn the setting off.
+- Optionally lets the car sleep after remote activity stops, while active transfers renew the timeout. A Keep awake override covers quiet sessions.
 - Resumes after a reboot or app update if you had connected before.
 
 The package ID is `dev.tailpark.byd`, so it installs alongside the official Tailscale app. Android allows only one active VPN at a time.

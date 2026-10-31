@@ -133,6 +133,7 @@
                 <action android:name="${applicationId}.BYD_RECOVER" />
                 <action android:name="${applicationId}.BYD_BOOTSTRAP" />
                 <action android:name="${applicationId}.BYD_HELPER_CHECK" />
+                <action android:name="${applicationId}.BYD_IDLE_EXPIRE" />
             </intent-filter>
         </receiver>
 

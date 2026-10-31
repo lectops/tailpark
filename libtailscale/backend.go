@@ -16,7 +16,9 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/tailscale/tailscale-android/libtailscale/parkedactivity"
 	"tailscale.com/drive/driveimpl"
 	_ "tailscale.com/feature/condregister"
 	"tailscale.com/feature/taildrop"
@@ -29,19 +31,24 @@ import (
 	"tailscale.com/net/dns"
 	"tailscale.com/net/netmon"
 	"tailscale.com/net/netns"
+	"tailscale.com/net/packet"
 	"tailscale.com/net/tsdial"
+	"tailscale.com/net/tstun"
 	"tailscale.com/paths"
 	"tailscale.com/tsd"
 	"tailscale.com/types/logger"
 	"tailscale.com/types/logid"
 	"tailscale.com/util/eventbus"
 	"tailscale.com/wgengine"
+	"tailscale.com/wgengine/filter"
 	"tailscale.com/wgengine/netstack"
+	"tailscale.com/wgengine/netstack/gro"
 	"tailscale.com/wgengine/router"
 )
 
 type App struct {
-	dataDir string
+	parkedActivity parkedactivity.Tracker
+	dataDir        string
 
 	// passes along SAF file information for the taildrop manager
 	directFileRoot  string
@@ -354,6 +361,29 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 		return nil, fmt.Errorf("netstack.Create: %w", err)
 	}
 	sys.Set(ns)
+	// Chain after ACL acceptance and before netstack consumes inbound packets.
+	// The outbound hook sees kernel traffic; inbound ACK progress also covers
+	// userspace/netstack sends (including Taildrop), which bypass that hook.
+	wrapped := sys.Tun.Get()
+	oldIn := wrapped.PostFilterPacketInboundFromWireGuard
+	wrapped.PostFilterPacketInboundFromWireGuard = func(p *packet.Parsed, w *tstun.Wrapper, g *gro.GRO) (filter.Response, *gro.GRO) {
+		a.parkedActivity.Observe(p, true, time.Now())
+		if oldIn != nil {
+			return oldIn(p, w, g)
+		}
+		return filter.Accept, g
+	}
+	oldOut := wrapped.PostFilterPacketOutboundToWireGuard
+	wrapped.PostFilterPacketOutboundToWireGuard = func(p *packet.Parsed, w *tstun.Wrapper) filter.Response {
+		if oldOut != nil {
+			if result := oldOut(p, w); result.IsDrop() {
+				return result
+			}
+		}
+		a.parkedActivity.Observe(p, false, time.Now())
+		return filter.Accept
+	}
+	a.parkedActivity.Ready()
 	ns.ProcessLocalIPs = false // let Android kernel handle it; VpnBuilder sets this up
 	ns.ProcessSubnets = true   // for Android-being-an-exit-node support
 	sys.NetstackRouter.Set(true)

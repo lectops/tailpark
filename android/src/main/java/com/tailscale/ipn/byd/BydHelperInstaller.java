@@ -48,6 +48,9 @@ public final class BydHelperInstaller {
                 if (runtime.file("disabled").exists() && !runtime.file("disabled").delete()) {
                     throw new IllegalStateException("Cannot enable watchdog");
                 }
+                if (runtime.file("idle-expired").exists() && !runtime.file("idle-expired").delete()) {
+                    throw new IllegalStateException("Cannot restart expired parked session");
+                }
                 // This grant allows the app to reopen BYD's cleared local debugging listener after boot.
                 try { BydShell.run(5, "/system/bin/pm", "grant", args[0], "android.permission.WRITE_SECURE_SETTINGS"); }
                 catch (Exception ignored) { }

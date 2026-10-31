@@ -242,3 +242,15 @@ var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 func escapeQuotes(s string) string {
 	return quoteEscaper.Replace(s)
 }
+
+// SetParkedActivityTracking enables bounded application-data observation for the
+// optional parked inactivity timer. Enabling starts a fresh conservative window.
+func (app *App) SetParkedActivityTracking(enabled bool) {
+	app.parkedActivity.Enable(enabled, time.Now())
+}
+
+// ParkedActivityIdleMillis returns -1 until observation is ready, otherwise
+// monotonic milliseconds since meaningful application traffic (or enabling).
+func (app *App) ParkedActivityIdleMillis() int64 {
+	return app.parkedActivity.IdleMillis(time.Now())
+}

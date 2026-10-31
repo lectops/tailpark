@@ -129,6 +129,9 @@ type ParcelFileDescriptor interface {
 // Application encapsulates the running Tailscale Application. There is only a
 // single instance of Application per Android application.
 type Application interface {
+	SetParkedActivityTracking(enabled bool)
+	ParkedActivityIdleMillis() int64
+
 	// CallLocalAPI provides a mechanism for calling Tailscale's HTTP localapi
 	// without having to call over the network.
 	CallLocalAPI(timeoutMillis int, method, endpoint string, body InputStream) (LocalAPIResponse, error)
