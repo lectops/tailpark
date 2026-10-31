@@ -11,6 +11,7 @@ import com.tailscale.ipn.byd.update.TailparkVersion;
 import java.io.File;
 import java.io.FileInputStream;
 import java.security.MessageDigest;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -30,11 +31,16 @@ public final class BydUpdateVerifier {
         return result.toString();
     }
 
-    @SuppressWarnings("deprecation")
     public static long verify(Context context, File file, String hash, String version) throws Exception {
+        return verify(context, file, hash, version, Build.VERSION.SDK_INT);
+    }
+
+    /** SDK injection keeps both supported PackageManager paths covered by host regressions. */
+    @SuppressWarnings("deprecation")
+    public static long verify(Context context, File file, String hash, String version, int sdk) throws Exception {
         if (!hash.matches("[a-f0-9]{64}") || !hash.equals(digest(file)))
             throw new SecurityException("Downloaded APK checksum does not match");
-        int flags = Build.VERSION.SDK_INT >= 28
+        int flags = sdk >= 28
                 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageManager manager = context.getPackageManager();
         PackageInfo archive = manager.getPackageArchiveInfo(file.getPath(), flags);
@@ -48,30 +54,44 @@ public final class BydUpdateVerifier {
             throw new SecurityException("Downloaded APK version does not match the release");
         if (previous == null || expected.compareTo(previous) <= 0)
             throw new SecurityException("Downloaded APK does not have a newer Tailpark version");
-        if (code(archive) <= code(installed))
+        if (code(archive, sdk) <= code(installed, sdk))
             throw new SecurityException("Downloaded APK does not have a newer Android version code");
-        if (!sameSigners(signers(installed), signers(archive)))
+        if (!sameSigners(signers(installed, sdk), signers(archive, sdk)))
             throw new SecurityException("Downloaded APK was not signed by the installed app signer");
-        return code(archive);
+        return code(archive, sdk);
     }
 
     @SuppressWarnings("deprecation")
     public static long code(PackageInfo info) {
-        return Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
+        return code(info, Build.VERSION.SDK_INT);
     }
 
     @SuppressWarnings("deprecation")
-    private static Signature[] signers(PackageInfo info) {
-        return Build.VERSION.SDK_INT >= 28
+    private static long code(PackageInfo info, int sdk) {
+        return sdk >= 28 ? info.getLongVersionCode() : info.versionCode;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Signature[] signers(PackageInfo info, int sdk) {
+        return sdk >= 28
                 ? info.signingInfo == null ? null : info.signingInfo.getApkContentsSigners()
                 : info.signatures;
     }
 
     public static boolean sameSigners(Signature[] installed, Signature[] archive) {
         if (installed == null || archive == null || installed.length == 0 || archive.length == 0) return false;
-        Set<Signature> expected = new HashSet<>(), actual = new HashSet<>();
-        java.util.Collections.addAll(expected, installed);
-        java.util.Collections.addAll(actual, archive);
-        return expected.equals(actual);
+        Set<ByteBuffer> expected = certificates(installed), actual = certificates(archive);
+        return expected != null && expected.equals(actual);
+    }
+
+    private static Set<ByteBuffer> certificates(Signature[] signers) {
+        Set<ByteBuffer> result = new HashSet<>();
+        for (Signature signer : signers) {
+            if (signer == null) return null;
+            byte[] encoded = signer.toByteArray();
+            if (encoded == null || encoded.length == 0) return null;
+            result.add(ByteBuffer.wrap(encoded).asReadOnlyBuffer());
+        }
+        return result;
     }
 }
