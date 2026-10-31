@@ -84,17 +84,23 @@ func (t *Tracker) Observe(p *packet.Parsed, inbound bool, now time.Time) {
 			if len(tr) >= 20 {
 				k := flow{p.Src, p.Dst}
 				prev := t.flows[k]
+				// A new handshake must not inherit an older connection's ACK
+				// sequence when the same address/port tuple is reused.
+				if p.TCPFlags&packet.TCPSyn != 0 {
+					prev = progress{}
+					delete(t.flows, k)
+				}
 				ack := binary.BigEndian.Uint32(tr[8:12])
 				// Advancing ACKs protect outbound userspace/netstack streams, whose
 				// writes bypass Android's TUN. Only a flow with observed application
 				// payload can establish this evidence; SYN/ACK scans cannot.
-				if prev.valid && now.Sub(prev.at) < 2*time.Minute && p.TCPFlags&packet.TCPAck != 0 {
+				if prev.valid && p.TCPFlags&packet.TCPAck != 0 {
 					delta := int32(ack - prev.ack)
 					if delta > 1 && delta <= 16*1024*1024 {
 						n += int(delta)
 					}
 				}
-				if payload > 1 || prev.valid && now.Sub(prev.at) < 2*time.Minute {
+				if payload > 1 || prev.valid {
 					if t.flows == nil {
 						t.flows = make(map[flow]progress)
 					}

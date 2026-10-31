@@ -169,3 +169,18 @@ func TestBurstOverflowNeverClaimsEvictedTransferIsIdle(t *testing.T) {
 		t.Fatal("explicit tracking reset did not recover")
 	}
 }
+
+func TestNetstackTransferResumesAfterLongQuietWork(t *testing.T) {
+	tracker, start := enabled(t)
+	tracker.Observe(tcp(50000, 8080, 100, 1000, 0x10), true, start)
+	now := start.Add(20 * time.Minute)
+	tracker.Observe(tcp(50000, 8080, 0, 128000, 0x10), true, now)
+	if tracker.IdleMillis(now) != 0 {
+		t.Fatal("resumed userspace payload lost after quiet preparation")
+	}
+	tracker.Observe(tcp(50000, 8080, 0, 0, 0x02), true, now.Add(time.Second)) // tuple reused
+	tracker.Observe(tcp(50000, 8080, 0, 256000, 0x10), true, now.Add(2*time.Second))
+	if tracker.IdleMillis(now.Add(2*time.Second)) != 2000 {
+		t.Fatal("new SYN inherited old stream evidence")
+	}
+}
