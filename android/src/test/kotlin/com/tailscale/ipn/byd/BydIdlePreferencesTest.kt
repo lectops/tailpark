@@ -53,6 +53,20 @@ class BydIdlePreferencesTest {
       BydPreferences.confirmIdleExpiry(context, 1, timeout, activity, power)
 
   @Test
+  fun savedTimerShowsPendingActivityInsteadOfDisabledStatusBeforeConnecting() {
+    values["wanted"] = false
+    BydPreferences.initialize(context)
+    assertEquals(120, BydPreferences.idleTimeoutMinutes.value)
+    assertEquals("Connect Tailscale to track remote activity", BydPreferences.idleStatus.value)
+    values["wanted"] = true
+    BydPreferences.resetIdle(context)
+    assertEquals("Waiting for parked activity state", BydPreferences.idleStatus.value)
+    values["enabled"] = false
+    BydPreferences.initialize(context)
+    assertEquals("Parked connectivity is off", BydPreferences.idleStatus.value)
+  }
+
+  @Test
   fun confirmedIdlePersistsTerminalStateAndRetainsWantedVpn() {
     assertTrue(confirm())
     assertTrue(BydPreferences.idleExpired(context))

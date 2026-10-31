@@ -24,14 +24,15 @@ object BydPreferences {
     idleTimeoutMinutes.value = prefs(context).getInt("idle_timeout_minutes", 0)
     keepAwake.value = prefs(context).getBoolean("idle_keep_awake", false)
     if (idleExpired(context)) {
-      idleStatus.value = "Sleep eligible · remote wake is not guaranteed"
       status.value = "Parked access ended after inactivity"
     }
+    refreshIdleStatus(context)
   }
 
   fun setEnabled(context: Context, value: Boolean) {
     prefs(context).edit().putBoolean("enabled", value).commit()
     enabled.value = value
+    refreshIdleStatus(context)
     if (!value) BydHelperConnection.stopAsync(context)
   }
 
@@ -42,6 +43,7 @@ object BydPreferences {
 
   fun setWanted(context: Context, value: Boolean) {
     prefs(context).edit().putBoolean("wanted", value).commit()
+    refreshIdleStatus(context)
     if (!value) BydHelperConnection.stopAsync(context)
   }
 
@@ -79,6 +81,20 @@ object BydPreferences {
             .putLong("idle_generation", preferences.getLong("idle_generation", 0) + 1)
             .commit()
     )
+    refreshIdleStatus(context)
+  }
+
+  internal fun refreshIdleStatus(context: Context) {
+    val preferences = prefs(context)
+    idleStatus.value =
+        when {
+          idleExpired(context) -> "Sleep eligible · remote wake is not guaranteed"
+          preferences.getInt("idle_timeout_minutes", 0) == 0 -> "No inactivity timeout"
+          !preferences.getBoolean("enabled", true) -> "Parked connectivity is off"
+          preferences.getBoolean("idle_keep_awake", false) -> "Keep awake for this parked session"
+          !wantsVpn(context) -> "Connect Tailscale to track remote activity"
+          else -> "Waiting for parked activity state"
+        }
   }
 
   /** An expired session never revives merely because the process or device restarted. */
