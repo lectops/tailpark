@@ -10,6 +10,18 @@ import java.util.List;
 import org.junit.Test;
 
 public class BydRecoveryCommandsTest {
+    @Test public void recorderCanDistinguishAcknowledgedRecoveryRejections() throws Exception {
+        String[] replies = {"RECOVERING", "DISABLED", "UNAVAILABLE", "REJECTED"};
+        BydRecoveryCommands.Outcome[] expected = {BydRecoveryCommands.Outcome.REQUESTED,
+                BydRecoveryCommands.Outcome.DISABLED, BydRecoveryCommands.Outcome.UNAVAILABLE,
+                BydRecoveryCommands.Outcome.REJECTED};
+        for (int i = 0; i < replies.length; i++) {
+            String reply = replies[i];
+            assertEquals(expected[i], BydRecoveryCommands.recoverObserved("dev.tailpark.byd", "test-token",
+                    (timeout, command) -> new BydShell.Result(0,
+                            "Broadcast completed: result=-1, data=\"" + reply + "\"\n")));
+        }
+    }
     @Test public void successfulShellExitWithoutReceiverDeliveryFallsBack() throws Exception {
         List<List<String>> commands = new ArrayList<>();
         BydRecoveryCommands.recover("dev.tailpark.byd", "test-token", (timeout, command) -> {

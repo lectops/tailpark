@@ -131,6 +131,8 @@ fun SettingsView(
       )
       Lists.ItemDivider()
       Setting.Text(R.string.byd_status_title, subtitle = parkedStatus)
+      Lists.ItemDivider()
+      BydDiagnosticsSettings()
       UpdateSettings()
 
       Lists.SectionDivider()

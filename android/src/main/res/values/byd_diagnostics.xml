@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="byd_diagnostics_title">Connection timeline</string>
+    <string name="byd_diagnostics_subtitle">View, export or clear local connection and power observations</string>
+    <string name="byd_diagnostics_refresh">Refresh</string>
+    <string name="byd_diagnostics_export">Export</string>
+    <string name="byd_diagnostics_clear">Clear</string>
+    <string name="byd_diagnostics_close">Close</string>
+    <string name="byd_diagnostics_saved">Diagnostics exported</string>
+    <string name="byd_diagnostics_export_failed">Could not export diagnostics</string>
+    <string name="byd_diagnostics_clear_failed">Could not clear diagnostics. Try again.</string>
+    <string name="byd_diagnostics_clear_pending">App history cleared. Helper history will be cleared when it is reachable again.</string>
+    <string name="byd_diagnostics_clear_title">Clear connection history?</string>
+    <string name="byd_diagnostics_clear_message">Delete the local app and helper timeline. New observations will continue to be recorded.</string>
+    <string name="byd_diagnostics_gap">Recording stopped; cause unknown. Final events may be missing.</string>
+</resources>

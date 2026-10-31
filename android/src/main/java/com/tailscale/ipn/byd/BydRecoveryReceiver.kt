@@ -14,6 +14,13 @@ import java.security.MessageDigest
 /** Boot/update recovery plus a DUMP-protected entrypoint for our shell helper. */
 class BydRecoveryReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
+    if (intent.action == Intent.ACTION_SHUTDOWN) {
+      val pending = goAsync()
+      BydDiagnostics.broadcast(context, BydFlightRecorder.Code.SHUTDOWN_OBSERVED) {
+        pending.finish()
+      }
+      return
+    }
     if (intent.action == "${context.packageName}.BYD_HELPER_CHECK") {
       val token = intent.getStringExtra("token")
       resultData =
@@ -70,6 +77,16 @@ class BydRecoveryReceiver : BroadcastReceiver() {
     }
     resultData = resumeVpn(context)
     resultCode = -1
+    val event =
+        when (intent.action) {
+          Intent.ACTION_BOOT_COMPLETED -> BydFlightRecorder.Code.BOOT_OBSERVED
+          Intent.ACTION_MY_PACKAGE_REPLACED -> BydFlightRecorder.Code.PACKAGE_REPLACED
+          else -> null
+        }
+    if (event != null) {
+      val pending = goAsync()
+      BydDiagnostics.broadcast(context, event) { pending.finish() }
+    }
   }
 
   companion object {
