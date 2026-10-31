@@ -79,6 +79,7 @@ public final class BydFlightRecorder {
     private final ArrayList<Event> events = new ArrayList<>();
     private final EnumMap<Code, Value> observed = new EnumMap<>(Code.class);
     private long nextSequence = 1;
+    private long clearedAtElapsed = -1;
     private int bytes;
 
     public BydFlightRecorder(File file, Source source, String version, long boot,
@@ -131,6 +132,8 @@ public final class BydFlightRecorder {
 
     public synchronized void observe(Code code, Value value, long wallMs, long elapsedMs)
             throws IOException {
+        // Check under the same monitor as clear(), before changing deduplication state.
+        if (elapsedMs <= clearedAtElapsed) return;
         if (observed.get(code) == value) return;
         record(code, value, wallMs, elapsedMs);
         observed.put(code, value);
@@ -138,6 +141,11 @@ public final class BydFlightRecorder {
 
     public synchronized void record(Code code, Value value, long wallMs, long elapsedMs)
             throws IOException {
+        if (elapsedMs <= clearedAtElapsed) return;
+        appendLocal(code, value, wallMs, elapsedMs);
+    }
+
+    private void appendLocal(Code code, Value value, long wallMs, long elapsedMs) throws IOException {
         Event event = new Event(nextSequence++, session, Math.max(0, wallMs),
                 Math.max(0, elapsedMs), boot, source, code, value, version);
         append(event);
@@ -203,9 +211,11 @@ public final class BydFlightRecorder {
     public String journalId() { return journalId; }
 
     public synchronized void clear(long wallMs, long elapsedMs) throws IOException {
+        // Equal timestamps are ambiguous at millisecond resolution; discard racing observations.
+        clearedAtElapsed = Math.max(clearedAtElapsed, elapsedMs);
         events.clear(); bytes = 0; observed.clear();
         session = UUID.randomUUID().toString().replace("-", "");
         rewrite();
-        record(Code.SESSION_STARTED, Value.HISTORY_CLEARED, wallMs, elapsedMs);
+        appendLocal(Code.SESSION_STARTED, Value.HISTORY_CLEARED, wallMs, elapsedMs);
     }
 }

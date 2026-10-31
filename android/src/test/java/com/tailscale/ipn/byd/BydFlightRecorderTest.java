@@ -132,6 +132,32 @@ public class BydFlightRecorderTest {
         assertNotEquals(oldIdentity, recreated.after(0, 10).get(0).identity());
     }
 
+    @Test public void staleWritersAfterClearCannotRestoreHistoryOrSuppressFreshState() throws Exception {
+        for (Source source : Source.values()) {
+            File file = new File(temporary.getRoot(), source + "-events.log");
+            BydFlightRecorder recorder = create(file, source, 7, 1000, 100);
+            recorder.observe(Code.NETWORK, Value.CELLULAR, 1100, 200);
+            recorder.clear(1500, 500);
+            long clearedSequence = recorder.lastSequence();
+            // These can be callbacks/broadcasts that captured time before waiting for clear's monitor.
+            recorder.observe(Code.NETWORK, Value.NO_NETWORK, 1200, 300);
+            recorder.record(Code.RECOVERY, Value.ATTEMPT, 1300, 400);
+            recorder.observe(Code.ACC, Value.OFF, 1500, 500);
+            recorder.record(Code.RECOVERY, Value.FAILED, 1500, 500);
+            assertEquals(1, recorder.snapshot().size());
+            assertEquals(Value.HISTORY_CLEARED, recorder.snapshot().get(0).value);
+            assertEquals(clearedSequence, recorder.lastSequence());
+            // Stale observations must not repopulate dedup state and hide the first fresh observation.
+            recorder.observe(Code.NETWORK, Value.NO_NETWORK, 1501, 501);
+            recorder.observe(Code.ACC, Value.OFF, 1501, 501);
+            recorder.record(Code.RECOVERY, Value.ATTEMPT, 1502, 502);
+            assertEquals(4, recorder.snapshot().size());
+            assertEquals(Code.NETWORK, recorder.snapshot().get(1).code);
+            assertEquals(Code.ACC, recorder.snapshot().get(2).code);
+            assertEquals(Code.RECOVERY, recorder.snapshot().get(3).code);
+        }
+    }
+
     @Test public void importedStringsCannotIntroduceSecretsOrUnrecognizedFields() throws Exception {
         BydFlightRecorder helper = create(new File(temporary.getRoot(), "helper.log"), Source.HELPER, 7, 1000, 100);
         String valid = helper.snapshot().get(0).encode();
