@@ -175,7 +175,7 @@ public final class BydPowerHelper {
             BydRecoveryCommands.Outcome outcome = BydRecoveryCommands.recoverObserved(context.getPackageName(), token);
             diagnostics.record(Code.RECOVERY, outcome == BydRecoveryCommands.Outcome.DISABLED ? Value.DISABLED
                     : outcome == BydRecoveryCommands.Outcome.UNAVAILABLE ? Value.UNAVAILABLE
-                    : outcome == BydRecoveryCommands.Outcome.REJECTED ? Value.REVOKED : Value.REQUESTED);
+                    : outcome == BydRecoveryCommands.Outcome.REJECTED ? Value.REJECTED : Value.REQUESTED);
         } catch (Exception e) {
             diagnostics.record(Code.RECOVERY, Value.FAILED);
             Log.w("Tailpark", "VPN recovery failed: " + e.getClass().getSimpleName());

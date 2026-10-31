@@ -61,7 +61,7 @@ open class IPNService : VpnService(), libtailscale.IPNService {
     // grab app to make sure it initializes
     app = App.get()
     BydDiagnostics.observe(this, BydFlightRecorder.Code.SERVICE, BydFlightRecorder.Value.STARTED)
-    BydDiagnostics.network(this, NetworkChangeCallback.cachedDefaultNetwork)
+    BydDiagnostics.network(this, NetworkChangeCallback.cachedDefaultNetwork, initial = true)
 
     NetworkChangeCallback.setUnderlyingNetworkListener { network ->
       updateUnderlyingNetwork(network)

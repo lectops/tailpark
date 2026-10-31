@@ -22,6 +22,18 @@ class BydDiagnosticTimelineTest {
       )
 
   @Test
+  fun bootBroadcastAndRejectedRequestAreDescribedWithoutInferringAnotherCause() {
+    val boot = event(1, code = "BOOT_OBSERVED")
+    assertEquals("Android boot observed", BydDiagnosticTimeline.describe(boot))
+    assertFalse(
+        BydDiagnosticTimeline.summary(listOf(boot)).contains("different Android boot count")
+    )
+    val rejected = event(2, source = "HELPER", code = "RECOVERY", value = "REJECTED")
+    assertTrue(BydDiagnosticTimeline.describe(rejected).contains("request rejected"))
+    assertFalse(BydDiagnosticTimeline.describe(rejected).contains("revoked"))
+  }
+
+  @Test
   fun startupSummaryAppearsForSavedPriorSessionsButNotFreshInstall() {
     assertFalse(BydDiagnosticTimeline.hasPreviousObservations(listOf(event(1))))
     assertTrue(

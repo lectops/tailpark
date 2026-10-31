@@ -90,10 +90,11 @@ object BydDiagnostics {
     }
   }
 
-  fun network(context: Context, network: Network?) {
+  fun network(context: Context, network: Network?, initial: Boolean = false) {
     val value =
-        if (network == null) Value.NO_NETWORK
-        else {
+        if (network == null) {
+          if (initial) Value.UNKNOWN else Value.NO_NETWORK
+        } else {
           val caps = runCatching {
             context
                 .getSystemService(ConnectivityManager::class.java)

@@ -43,7 +43,7 @@ object BydDiagnosticTimeline {
           "The timeline does not establish why the network disappeared."
     }
     if (ordered.any { it.code == Code.BOOT_OBSERVED }) {
-      return "A different Android boot count was observed. Events before the restart are retained " +
+      return "An Android boot was observed. Events before the restart are retained " +
           "when available; the recorder cannot establish why Android restarted."
     }
     if (interruptedSessions(ordered).isNotEmpty()) {
@@ -76,7 +76,7 @@ object BydDiagnosticTimeline {
             if (event.value == Value.HISTORY_CLEARED) "History cleared; recording resumed"
             else "${source(event)} recording started · ${event.version}"
         Code.SESSION_STOPPED -> "${source(event)} stopped · ${label(event.value)}"
-        Code.BOOT_OBSERVED -> "Different Android boot count observed"
+        Code.BOOT_OBSERVED -> "Android boot observed"
         Code.SERVICE -> "VPN service · ${label(event.value)}"
         Code.NETWORK ->
             if (event.source == Source.HELPER)
@@ -133,6 +133,7 @@ object BydDiagnosticTimeline {
         Value.NEEDS_LOGIN -> "sign-in needed"
         Value.NEEDS_MACHINE_AUTH -> "device authorization needed"
         Value.REQUESTED -> "command completed; connectivity not yet confirmed"
+        Value.REJECTED -> "request rejected"
         Value.ATTEMPT -> "attempt started"
         Value.OK -> "no reported error"
         else -> value.name.lowercase(Locale.ROOT).replace('_', ' ')
