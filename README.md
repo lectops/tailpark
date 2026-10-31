@@ -63,6 +63,8 @@ The build fetches the pinned Tailscale Go toolchain, builds the networking libra
 
 Stable upstream updates are checked every six hours and built, tested, signed and published by GitHub Actions. See [automated releases](docs/RELEASING.md) for configuration and recovery steps.
 
+The app also checks stable releases in **Settings → Updates**, with an optional **Automatically update while parked** setting that is off by default. See [in-app updates](docs/UPDATES.md) for validation, parked-state requirements and Android install confirmation fallback.
+
 A signing key is generated in `.signing/` on first build. Keep that directory: Android only installs updates signed with the same key. Your own builds can't update the published release APK, and the reverse is also true.
 
 ## License

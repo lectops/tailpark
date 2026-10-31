@@ -92,6 +92,7 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
         throw IllegalStateException("Reloading parked helper")
       }
       helper = BydHelperConnection.request(context, config)
+      helper?.let { com.tailscale.ipn.byd.update.UpdateManager.observeHelperStatus(context, it) }
       setupMessage = null
       if (status.optBoolean("watchdogAlive")) return
     } catch (_: Exception) {

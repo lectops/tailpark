@@ -27,6 +27,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.tailscale.ipn.byd.BydPreferences
+import com.tailscale.ipn.byd.update.UpdateManager
 import com.tailscale.ipn.mdm.MDMSettings
 import com.tailscale.ipn.mdm.MDMSettingsChangedReceiver
 import com.tailscale.ipn.ui.localapi.Client
@@ -116,6 +117,7 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
   override fun onCreate() {
     super.onCreate()
     BydPreferences.initialize(this)
+    UpdateManager.initialize(this)
     appInstance = this
     setUnprotectedInstance(this)
     mdmChangeReceiver = MDMSettingsChangedReceiver()
