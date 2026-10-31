@@ -69,6 +69,23 @@ class BydDiagnosticTimelineTest {
   }
 
   @Test
+  fun unknownBootKeepsSavedSessionOrderWhenWallClockMovesBackwards() {
+    val first = event(1, boot = -1, wall = 5000)
+    val second = event(2, session = "b".repeat(32), boot = -1, wall = 1000)
+    val ordered = BydDiagnosticTimeline.ordered(listOf(first, second))
+    assertEquals(listOf(first, second), ordered)
+    assertEquals(setOf(first.session), BydDiagnosticTimeline.interruptedSessions(ordered))
+    assertTrue(BydDiagnosticTimeline.summary(ordered).contains("Recording stopped; cause unknown"))
+    // Helper directory recreation may reset sequences; import order still identifies the old
+    // session.
+    val reset = event(1, session = "c".repeat(32), source = "HELPER", boot = -1, wall = 500)
+    val helper = event(20, session = "d".repeat(32), source = "HELPER", boot = -1, wall = 6000)
+    val imported = BydDiagnosticTimeline.ordered(listOf(helper, reset))
+    assertEquals(listOf(helper, reset), imported)
+    assertEquals(setOf(helper.session), BydDiagnosticTimeline.interruptedSessions(imported))
+  }
+
+  @Test
   fun wallClockJumpUsesElapsedOrderWithinBoot() {
     val loss = event(2, wall = 5000, elapsed = 200, code = "NETWORK", value = "NO_NETWORK")
     val recovery =

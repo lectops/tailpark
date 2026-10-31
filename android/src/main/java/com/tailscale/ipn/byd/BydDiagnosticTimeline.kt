@@ -19,12 +19,14 @@ object BydDiagnosticTimeline {
           .any { records -> records.map { it.session }.distinct().size > 1 } ||
           events.any { it.code == Code.BOOT_OBSERVED || it.code == Code.RECOVERY }
 
+  // Keep saved/import order when boot identity is unknown: wall time and reset sequences cannot
+  // establish an order across those sessions. sortedWith is stable for equal comparator values.
   fun ordered(events: List<Event>): List<Event> =
       events.sortedWith(
           compareBy<Event> { if (it.boot >= 0) it.boot else Long.MAX_VALUE }
-              .thenBy { if (it.boot >= 0) it.elapsedMs else it.wallMs }
-              .thenBy { it.source.name }
-              .thenBy { it.sequence }
+              .thenBy { if (it.boot >= 0) it.elapsedMs else 0L }
+              .thenBy { if (it.boot >= 0) it.source.name else "" }
+              .thenBy { if (it.boot >= 0) it.sequence else 0L }
       )
 
   fun summary(events: List<Event>): String {
