@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tailpark_updates" translatable="false">Updates</string>
+    <string name="tailpark_auto_update" translatable="false">Automatically update while parked</string>
+</resources>

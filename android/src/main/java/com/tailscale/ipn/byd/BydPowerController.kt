@@ -98,6 +98,7 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
           BydFlightRecorder.Value.AVAILABLE,
       )
       BydDiagnostics.syncHelper(context)
+      helper?.let { com.tailscale.ipn.byd.update.UpdateManager.observeHelperStatus(context, it) }
       setupMessage = null
       if (status.optBoolean("watchdogAlive")) return
     } catch (_: Exception) {
