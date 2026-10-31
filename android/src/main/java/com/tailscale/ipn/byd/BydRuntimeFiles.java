@@ -29,7 +29,7 @@ final class BydRuntimeFiles {
         }
     }
 
-    void write(String name, String value) throws IOException {
+    synchronized void write(String name, String value) throws IOException {
         File temporary = file(name + ".new." + Process.myPid());
         Files.write(temporary.toPath(), value.getBytes(StandardCharsets.UTF_8));
         if (!temporary.renameTo(file(name))) {
@@ -43,6 +43,20 @@ final class BydRuntimeFiles {
     }
 
     void disable() throws IOException { write("disabled", "stopped\n"); }
+
+    boolean confirmIdleExpiry(String packageName, String token, long generation, long timeout) throws IOException, InterruptedException {
+        BydShell.Result result = BydShell.run(5, "/system/bin/am", "broadcast",
+                "--receiver-foreground", "--include-stopped-packages", "-n",
+                packageName + "/com.tailscale.ipn.byd.BydRecoveryReceiver", "-a",
+                packageName + ".BYD_IDLE_EXPIRE", "--es", "token", token,
+                "--el", "generation", Long.toString(generation), "--el", "timeout", Long.toString(timeout));
+        return result.exitCode == 0 && result.output.contains("data=\"IDLE_CONFIRMED\"");
+    }
+
+    String bootId() {
+        try { return new String(Files.readAllBytes(new File("/proc/sys/kernel/random/boot_id").toPath()), StandardCharsets.UTF_8).trim(); }
+        catch (IOException e) { return ""; }
+    }
 
     boolean watchdogAlive() { return watchdogIdentity() != null; }
 

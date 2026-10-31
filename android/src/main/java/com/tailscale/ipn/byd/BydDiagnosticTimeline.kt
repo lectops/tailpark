@@ -96,6 +96,7 @@ object BydDiagnosticTimeline {
         Code.SUSPEND -> "Android suspend interval of at least 30 seconds observed"
         Code.PACKAGE_REPLACED -> "App replacement broadcast observed"
         Code.SHUTDOWN_OBSERVED -> "Android shutdown broadcast observed; completion unconfirmed"
+        Code.PARKED_ACCESS -> "Parked access · ${label(event.value)}"
         Code.HISTORY_LIMITED -> "Some older helper observations were rotated out"
       }
 
@@ -129,6 +130,7 @@ object BydDiagnosticTimeline {
 
   private fun label(value: Value): String =
       when (value) {
+        Value.IDLE_EXPIRED -> "inactivity timeout confirmed"
         Value.NO_NETWORK -> "none available"
         Value.NO_STATE -> "unknown"
         Value.IN_USE_OTHER_USER -> "in use by another user"

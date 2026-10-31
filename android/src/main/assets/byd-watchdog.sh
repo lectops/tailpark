@@ -62,7 +62,7 @@ trap cleanup EXIT
 printf '[%s] Watchdog started\n' "$(date -u)" >> "$LOG"
 
 RETRIES=0
-while [ ! -f "$DIR/disabled" ]; do
+while [ ! -f "$DIR/disabled" ] && [ ! -f "$DIR/idle-expired" ]; do
     # Each iteration resolves current code; never pin a removed APK path.
     APK=$(pm path "$PKG" 2>/dev/null | sed -n 's/^package://p' | head -n 1)
     if [ -z "$APK" ]; then break; fi
@@ -88,7 +88,7 @@ while [ ! -f "$DIR/disabled" ]; do
     fi
     UPDATE=0
     while kill -0 "$CHILD" 2>/dev/null; do
-        if [ -f "$DIR/disabled" ]; then exit 0; fi
+        if [ -f "$DIR/disabled" ] || [ -f "$DIR/idle-expired" ]; then exit 0; fi
         NOW=$(clock)
         if [ "$NOW" -ge "$NEXT_CHECK" ]; then
             NEXT_CHECK=$((NOW + 15))
@@ -118,7 +118,7 @@ while [ ! -f "$DIR/disabled" ]; do
         sleep 5
     done
     stop_child
-    if [ -f "$DIR/disabled" ]; then exit 0; fi
+    if [ -f "$DIR/disabled" ] || [ -f "$DIR/idle-expired" ]; then exit 0; fi
     if [ "$UPDATE" -eq 1 ]; then
         cleanup
         exec /system/bin/sh "$SCRIPT"
@@ -130,7 +130,7 @@ while [ ! -f "$DIR/disabled" ]; do
     [ "$DELAY" -gt 60 ] && DELAY=60
     printf '[%s] Helper stopped; retrying in %ss\n' "$(date -u)" "$DELAY" >> "$LOG"
     while [ "$DELAY" -gt 0 ]; do
-        [ -f "$DIR/disabled" ] && exit 0
+        { [ -f "$DIR/disabled" ] || [ -f "$DIR/idle-expired" ]; } && exit 0
         sleep 1
         DELAY=$((DELAY - 1))
     done

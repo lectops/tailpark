@@ -363,12 +363,14 @@ class App : UninitializedApp(), libtailscale.AppContext, ViewModelStoreOwner {
    * value without needing a fully initialized instance of the application.
    */
   private fun updateConnStatus(ableToStartVPN: Boolean) {
+    BydPreferences.resetIdleIfDriving(this)
     val wasReady = isAbleToStartVPN()
     setAbleToStartVPN(ableToStartVPN)
     if (
         !wasReady &&
             ableToStartVPN &&
             BydPreferences.wantsVpn(this) &&
+            !BydPreferences.idleExpired(this) &&
             VpnService.prepare(this) == null
     ) {
       startVPN()

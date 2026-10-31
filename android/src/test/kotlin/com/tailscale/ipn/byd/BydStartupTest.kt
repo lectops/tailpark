@@ -60,6 +60,15 @@ class BydStartupTest {
   }
 
   @Test
+  fun expiredParkedSessionDoesNotResumeOnBootOrBackendReadiness() {
+    values["idle_expired"] = true
+    assertEquals("IDLE_EXPIRED", recover())
+    assertTrue(BydPreferences.wantsVpn(context))
+    assertFalse(initialized)
+    verifyNoInteractions(app)
+  }
+
+  @Test
   fun explicitDisconnectPreventsBootReconnectAndBackendInitialization() {
     values["wanted"] = false
     assertEquals("DISABLED", recover())

@@ -20,6 +20,7 @@ watchdog() {
     python3 scripts/test-byd-watchdog.py --report outputs/tailpark/watchdog-tests.json
 }
 native() {
+    ./tool/go test ./libtailscale/parkedactivity
     make libtailscale
 }
 android() {

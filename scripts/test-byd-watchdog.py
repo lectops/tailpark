@@ -152,6 +152,25 @@ print("package:" + (pathlib.Path(os.environ["BYD_FIXTURE"]) / "test-apk").read_t
         self.assertEqual(0, process.wait(timeout=4))
         self.assertEqual(1, len(self.events()))
 
+    def test_idle_expiry_stops_and_stays_terminal_after_supervisor_restart(self):
+        process = self.start()
+        self.eventually(lambda: len(self.events()) == 1)
+        (self.directory / "idle-expired").touch()
+        self.assertEqual(0, process.wait(timeout=8))
+        replacement = self.start()
+        self.assertEqual(0, replacement.wait(timeout=4))
+        self.assertEqual(1, len(self.events()))
+        self.assertFalse((self.directory / "disabled").exists())
+
+    def test_idle_expiry_during_backoff_prevents_respawn(self):
+        process = self.start()
+        self.eventually(lambda: len(self.events()) == 1)
+        os.kill(self.events()[0]["pid"], signal.SIGKILL)
+        self.eventually(lambda: "retrying" in (self.directory / "helper.log").read_text())
+        (self.directory / "idle-expired").touch()
+        self.assertEqual(0, process.wait(timeout=4))
+        self.assertEqual(1, len(self.events()))
+
     def test_apk_update_reloads_even_with_fresh_heartbeats(self):
         self.start()
         self.eventually(lambda: len(self.events()) == 1)

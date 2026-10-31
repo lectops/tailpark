@@ -5,6 +5,7 @@ package com.tailscale.ipn.byd
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import com.tailscale.ipn.App
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
@@ -18,6 +19,7 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
   @Volatile private var helper: JSONObject? = null
   @Volatile private var setupMessage: String? = null
   private var stoppedHelper = false
+  private val localIdle = ParkedIdlePolicy()
 
   @Synchronized
   fun start() {
@@ -39,13 +41,22 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
   private fun tick() {
     if (!running) return
     try {
+      BydPreferences.resetIdleIfDriving(context) { platform.powerLevel() }
       if (!BydPreferences.shouldResume(context)) {
         platform.release()
         state.tick(false, false, null, null, SystemClock.elapsedRealtime())
         helper = null
         if (!stoppedHelper) BydHelperConnection.stopAsync(context)
         stoppedHelper = true
-        BydPreferences.status.value = "Parked connectivity is off"
+        BydPreferences.status.value =
+            if (BydPreferences.idleExpired(context))
+                "Parked access ended after inactivity · reconnect when the car starts"
+            else "Parked connectivity is off"
+        BydPreferences.idleStatus.value =
+            if (BydPreferences.idleExpired(context))
+                "Sleep eligible · remote wake is not guaranteed"
+            else "No inactivity timeout"
+        runCatching { App.get().getLibtailscaleApp().setParkedActivityTracking(false) }
         return
       }
       stoppedHelper = false
@@ -54,12 +65,49 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
       if (remote != null) {
         platform.release()
         BydPreferences.status.value = describe(remote.optString("phase"), remote.optString("error"))
+        BydPreferences.idleStatus.value =
+            describeIdle(remote.optString("idleState"), remote.optLong("idleRemainingMs"))
       } else {
+        val now = SystemClock.elapsedRealtime()
+        val power = platform.powerLevel()
+        val idleMs = activityIdleMillis()
+        val prefs = BydPreferences.prefs(context)
+        localIdle.configure(
+            prefs.getInt("idle_timeout_minutes", 0) * 60000L,
+            prefs.getBoolean("idle_keep_awake", false),
+            prefs.getLong("idle_generation", 0),
+            now,
+        )
+        localIdle.observe(power, now)
+        localIdle.report(idleMs, vpnActive(), now)
+        if (
+            localIdle.shouldConfirm(power, now) &&
+                BydPreferences.confirmIdleExpiry(
+                    context,
+                    localIdle.generation(),
+                    localIdle.timeoutMs(),
+                    readActivity = { activityIdleMillis() },
+                    readPower = { platform.powerLevel() },
+                )
+        ) {
+          localIdle.expire()
+          BydDiagnostics.observe(
+              context,
+              BydFlightRecorder.Code.PARKED_ACCESS,
+              BydFlightRecorder.Value.IDLE_EXPIRED,
+          )
+          platform.release()
+          BydHelperConnection.stopAsync(context)
+          BydPreferences.idleStatus.value = "Sleep eligible · remote wake is not guaranteed"
+          return
+        }
+        BydPreferences.idleStatus.value =
+            describeIdle(localIdle.state(power, now), localIdle.remainingMs(now))
         platform.holdLocks(keepWifi)
         state.tick(
             true,
             keepWifi,
-            platform.powerLevel(),
+            power,
             platform.screenOn(),
             SystemClock.elapsedRealtime(),
         )
@@ -91,7 +139,13 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
         )
         throw IllegalStateException("Reloading parked helper")
       }
-      helper = BydHelperConnection.request(context, config)
+      BydHelperConnection.request(context, config)
+      val prefs = BydPreferences.prefs(context)
+      helper =
+          BydHelperConnection.request(
+              context,
+              "IDLE ${prefs.getInt("idle_timeout_minutes", 0) * 60000L} ${if (prefs.getBoolean("idle_keep_awake", false)) 1 else 0} ${prefs.getLong("idle_generation", 0)} ${activityIdleMillis()} $health",
+          )
       BydDiagnostics.observe(
           context,
           BydFlightRecorder.Code.HELPER,
@@ -140,6 +194,27 @@ class BydPowerController(private val context: Context, private val vpnActive: ()
     platform.release()
     if (!BydPreferences.shouldResume(context)) BydHelperConnection.stopAsync(context)
   }
+
+  private fun activityIdleMillis(): Long = runCatching {
+    val app = App.get().getLibtailscaleApp()
+    app.setParkedActivityTracking(
+        BydPreferences.prefs(context).getInt("idle_timeout_minutes", 0) > 0
+    )
+    app.parkedActivityIdleMillis()
+  }
+      .getOrDefault(-1L)
+
+  private fun describeIdle(state: String, remaining: Long): String =
+      when (state) {
+        "disabled" -> "No inactivity timeout"
+        "driving" -> "Idle window starts when you park"
+        "keep_awake" -> "Keep awake for this parked session"
+        "activity" -> "Remote activity detected"
+        "tracking" -> "Sleep eligible in ${(remaining + 59999) / 60000} minutes"
+        "sleep_pending" -> "Checking for remote activity before releasing parked access"
+        "expired" -> "Sleep eligible · remote wake is not guaranteed"
+        else -> "Activity tracking unavailable · keeping parked access awake"
+      }
 
   private fun describe(phase: String, error: String?): String {
     if (!error.isNullOrBlank() && error != "null") return "Parked connectivity: $error"

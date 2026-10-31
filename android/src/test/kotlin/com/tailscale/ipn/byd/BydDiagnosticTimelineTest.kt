@@ -22,6 +22,15 @@ class BydDiagnosticTimelineTest {
       )
 
   @Test
+  fun idleExpiryIsAnObservedDecisionWithoutClaimingVehicleSleep() {
+    val expired = event(2, code = "PARKED_ACCESS", value = "IDLE_EXPIRED")
+    val description = BydDiagnosticTimeline.describe(expired)
+    assertTrue(description.contains("inactivity timeout confirmed"))
+    assertFalse(description.contains("car slept"))
+    assertFalse(description.contains("battery"))
+  }
+
+  @Test
   fun bootBroadcastAndRejectedRequestAreDescribedWithoutInferringAnotherCause() {
     val boot = event(1, code = "BOOT_OBSERVED")
     assertEquals("Android boot observed", BydDiagnosticTimeline.describe(boot))

@@ -9,11 +9,45 @@ import android.net.VpnService
 import android.util.Base64
 import com.tailscale.ipn.App
 import com.tailscale.ipn.UninitializedApp
+import com.tailscale.ipn.ui.model.Ipn
+import com.tailscale.ipn.ui.notifier.Notifier
 import java.security.MessageDigest
 
 /** Boot/update recovery plus a DUMP-protected entrypoint for our shell helper. */
 class BydRecoveryReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
+    if (intent.action == "${context.packageName}.BYD_IDLE_EXPIRE") {
+      val token = intent.getStringExtra("token")
+      val authorized =
+          token != null &&
+              MessageDigest.isEqual(
+                  token.toByteArray(),
+                  BydPreferences.token(context).toByteArray(),
+              )
+      resultData =
+          if (authorized) {
+            if (
+                Notifier.state.value == Ipn.State.Running &&
+                    BydPreferences.confirmIdleExpiry(
+                        context,
+                        intent.getLongExtra("generation", -1),
+                        intent.getLongExtra("timeout", 0),
+                        readActivity = {
+                          App.get().getLibtailscaleApp().parkedActivityIdleMillis()
+                        },
+                    )
+            ) {
+              BydDiagnostics.observe(
+                  context,
+                  BydFlightRecorder.Code.PARKED_ACCESS,
+                  BydFlightRecorder.Value.IDLE_EXPIRED,
+              )
+              "IDLE_CONFIRMED"
+            } else "IDLE_DEFERRED"
+          } else "REJECTED"
+      resultCode = -1
+      return
+    }
     if (intent.action == Intent.ACTION_SHUTDOWN) {
       val pending = goAsync()
       BydDiagnostics.broadcast(context, BydFlightRecorder.Code.SHUTDOWN_OBSERVED) {
@@ -97,6 +131,8 @@ class BydRecoveryReceiver : BroadcastReceiver() {
         initialize: () -> Unit = { App.get() },
         stopHelper: () -> Unit = { BydHelperConnection.stopAsync(context) },
     ): String {
+      BydPreferences.resetIdleIfDriving(context)
+      if (BydPreferences.idleExpired(context)) return "IDLE_EXPIRED"
       if (!BydPreferences.wantsVpn(context)) {
         stopHelper()
         return "DISABLED"

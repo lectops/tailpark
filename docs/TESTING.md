@@ -48,3 +48,7 @@ python3 scripts/monitor-byd.py \
 The machine running it needs the `tailscale` and `adb` commands, a login to the same tailnet, and ADB already authorized on the head unit. A sample counts as healthy parked only if the snapshot and heartbeat are under 15 seconds old, ACC is off, the screen is off, the helper is in its parked phase, the watchdog is alive, and there's no helper error. Results go to `samples.ndjson`, `latest.json` and `summary.json` in the output folder.
 
 Run `python3 scripts/test-monitor-byd.py` to test the monitor's logic without contacting a car.
+
+## Inactivity timer validation
+
+Host coverage includes four-hour active payload streams, outbound netstack ACK progress, DNS/keepalive/SYN probes, traffic debounce, idle reporter loss/restart, renewal just before expiry, Keep awake, ACC/unknown-state gating, restored terminal sessions and watchdog expiry during normal operation/backoff/restart. The final confirmation persists terminal expiry before the helper stops. Hardware validation remains required before relying on the timeout: run a multi-hour video transfer across the chosen idle duration, leave only an idle socket/keepalives, renew traffic near expiry, crash/restart the app/helper, reboot while expired, then verify the next ACC-on app startup restores normal parked operation without losing login. Verify display ownership and all Tailpark wake/Wi-Fi locks release at expiry. No vehicle was contacted during implementation.

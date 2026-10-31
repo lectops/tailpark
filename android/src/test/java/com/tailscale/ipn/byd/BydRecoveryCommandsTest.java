@@ -11,9 +11,9 @@ import org.junit.Test;
 
 public class BydRecoveryCommandsTest {
     @Test public void recorderCanDistinguishAcknowledgedRecoveryRejections() throws Exception {
-        String[] replies = {"RECOVERING", "DISABLED", "UNAVAILABLE", "REJECTED"};
+        String[] replies = {"RECOVERING", "DISABLED", "IDLE_EXPIRED", "UNAVAILABLE", "REJECTED"};
         BydRecoveryCommands.Outcome[] expected = {BydRecoveryCommands.Outcome.REQUESTED,
-                BydRecoveryCommands.Outcome.DISABLED, BydRecoveryCommands.Outcome.UNAVAILABLE,
+                BydRecoveryCommands.Outcome.DISABLED, BydRecoveryCommands.Outcome.IDLE_EXPIRED, BydRecoveryCommands.Outcome.UNAVAILABLE,
                 BydRecoveryCommands.Outcome.REJECTED};
         for (int i = 0; i < replies.length; i++) {
             String reply = replies[i];
@@ -36,7 +36,7 @@ public class BydRecoveryCommandsTest {
     }
 
     @Test public void acknowledgedRecoveryAndStopsNeverLaunchActivity() throws Exception {
-        for (String reply : new String[]{"RECOVERING", "DISABLED", "UNAVAILABLE", "REJECTED"}) {
+        for (String reply : new String[]{"RECOVERING", "DISABLED", "IDLE_EXPIRED", "UNAVAILABLE", "REJECTED"}) {
             List<List<String>> commands = new ArrayList<>();
             BydRecoveryCommands.recover("dev.tailpark.byd", "test-token", (timeout, command) -> {
                 commands.add(Arrays.asList(command));
