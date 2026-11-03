@@ -1,10 +1,10 @@
 # Installing Tailpark
 
-Tailpark 1.104.4-byd.7 is the full Tailscale Android client with parked connectivity added and enabled by default. It uses BYD's Android wake and backlight interfaces and a supervised power helper. Built-in cellular data and Wi-Fi (including a separate hotspot) both work through Tailscale's normal network selection.
+Tailpark 1.104.5-byd.7 is the full Tailscale Android client with parked connectivity added and enabled by default. It uses BYD's Android wake and backlight interfaces and a supervised power helper. Built-in cellular data and Wi-Fi (including a separate hotspot) both work through Tailscale's normal network selection.
 
 ## Install and connect
 
-1. Install `Tailpark-1.104.4-byd.7.apk` through the car's file manager. Its package is `dev.tailpark.byd`, so it installs alongside the official Tailscale app.
+1. Install `Tailpark-1.104.5-byd.7.apk` through the car's file manager. Its package is `dev.tailpark.byd`, so it installs alongside the official Tailscale app.
 2. Open **Tailpark**, sign in, and grant Android VPN permission. Only one VPN can be active, so disconnect any other VPN app.
 3. Keep Android debugging enabled on the head unit. When Android asks to allow debugging from `tailpark@headunit`, select **Always allow** and accept. The app uses this local connection to start its power helper.
 4. Open **Settings → Start and connect with the car** to open BYD startup management and allow Tailpark to start. Electro's setup guide describes this as a restriction list: **uncheck Tailpark** to permit automatic startup. Confirm the wording on your firmware. Revisit this setting after app updates. If the shortcut is unavailable, open the car settings manually.
@@ -52,7 +52,7 @@ python3 scripts/setup-byd-helper.py --serial YOUR_ADB_SERIAL
 To install over ADB instead of the file manager:
 
 ```sh
-adb -s YOUR_ADB_SERIAL install -r Tailpark-1.104.4-byd.7.apk
+adb -s YOUR_ADB_SERIAL install -r Tailpark-1.104.5-byd.7.apk
 ```
 
 The app keeps retrying its own local connection, so once its debugging key is authorized it can bring the helper back after a reboot.

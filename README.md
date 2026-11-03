@@ -2,7 +2,7 @@
 
 Tailpark keeps your BYD head unit on your tailnet after you switch the car off, so you can reach it remotely while it's parked.
 
-It is an unofficial fork of the [Tailscale Android client](https://github.com/tailscale/tailscale-android) 1.104.4 with a parked-connectivity controller added. Tailpark is not affiliated with or endorsed by Tailscale Inc. or BYD. "Tailscale" is a trademark of Tailscale Inc.
+It is an unofficial fork of the [Tailscale Android client](https://github.com/tailscale/tailscale-android) 1.104.5 with a parked-connectivity controller added. Tailpark is not affiliated with or endorsed by Tailscale Inc. or BYD. "Tailscale" is a trademark of Tailscale Inc.
 
 ## What it does
 
