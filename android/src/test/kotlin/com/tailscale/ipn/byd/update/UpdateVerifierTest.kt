@@ -123,10 +123,27 @@ class UpdateVerifierTest {
     archive.signatures = arrayOf(certificate(9))
     installed.versionCode = 999
     archive.versionCode = 1
-    assertEquals(4_294_967_397L, verify(sdk = 29))
+    assertEquals(4_294_967_397L, verify(sdk = 30))
     verify(manager).getPackageArchiveInfo(any(), eq(PackageManager.GET_SIGNING_CERTIFICATES))
     verify(manager)
         .getPackageInfo(eq("dev.tailpark.byd"), eq(PackageManager.GET_SIGNING_CERTIFICATES))
+  }
+
+  @Test
+  fun android9And10CollectArchiveCertificatesOnlyWhenLegacyFlagIsPresent() {
+    for (sdk in listOf(28, 29)) {
+      modern()
+      val collected = archive.signingInfo
+      // Android 9/10 getPackageArchiveInfo only collects archive certificates for GET_SIGNATURES.
+      whenever(manager.getPackageArchiveInfo(any(), any<Int>())).thenAnswer {
+        archive.signingInfo =
+            if (it.getArgument<Int>(1) and PackageManager.GET_SIGNATURES != 0) collected else null
+        archive
+      }
+      assertEquals(4_294_967_397L, verify(sdk = sdk))
+      verify(manager, atLeastOnce())
+          .getPackageInfo(eq("dev.tailpark.byd"), eq(PackageManager.GET_SIGNING_CERTIFICATES))
+    }
   }
 
   @Test
