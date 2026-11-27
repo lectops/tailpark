@@ -43,7 +43,9 @@ public final class BydUpdateVerifier {
         int flags = sdk >= 28
                 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageManager manager = context.getPackageManager();
-        PackageInfo archive = manager.getPackageArchiveInfo(file.getPath(), flags);
+        // Android 9/10 collect archive certificates only for GET_SIGNATURES; signingInfo is still read below.
+        int archiveFlags = sdk == 28 || sdk == 29 ? flags | PackageManager.GET_SIGNATURES : flags;
+        PackageInfo archive = manager.getPackageArchiveInfo(file.getPath(), archiveFlags);
         PackageInfo installed = manager.getPackageInfo(context.getPackageName(), flags);
         if (archive == null || !context.getPackageName().equals(archive.packageName))
             throw new SecurityException("Downloaded APK has the wrong package");
